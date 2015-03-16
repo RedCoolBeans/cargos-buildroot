@@ -1,0 +1,96 @@
+menu "Target packages"
+
+	source "package/busybox/Config.in"
+
+menu "Compressors and decompressors"
+	source "package/lz4/Config.in"
+	source "package/lzop/Config.in"
+	source "package/xz/Config.in"
+endmenu
+
+menu "Debugging, profiling and benchmark"
+	source "package/gdb/Config.in"
+endmenu
+
+menu "Development tools"
+	source "package/binutils/Config.in"
+	source "package/egcc/Config.in"
+if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
+	source "package/gawk/Config.in"
+endif
+	source "package/gettext/Config.in"
+	source "package/gperf/Config.in"
+	source "package/libtool/Config.in"
+	source "package/pkgconf/Config.in"
+endmenu
+
+menu "Filesystem and flash utilities"
+	source "package/btrfs-progs/Config.in"
+	source "package/e2fsprogs/Config.in"
+	source "package/squashfs/Config.in"
+	source "package/unionfs/Config.in"
+endmenu
+
+menu "Hardware handling"
+menu "Firmware"
+	source "package/linux-firmware/Config.in"
+endmenu
+	source "package/acpid/Config.in"
+	source "package/cryptsetup/Config.in"
+	source "package/eudev/Config.in"
+	source "package/lvm2/Config.in"
+	source "package/udev/Config.in"
+endmenu
+
+menu "Libraries"
+
+menu "Compression and decompression"
+	source "package/lzo/Config.in"
+	source "package/zlib/Config.in"
+endmenu
+
+menu "Filesystem"
+	source "package/libfuse/Config.in"
+endmenu
+
+menu "Other"
+	source "package/tzdata/Config.in"
+endmenu
+
+menu "Security"
+	source "package/libselinux/Config.in"
+	source "package/libsemanage/Config.in"
+	source "package/libsepol/Config.in"
+endmenu
+
+endmenu
+
+menu "Networking applications"
+	source "package/iptables/Config.in"
+endmenu
+
+menu "Shell and utilities"
+comment "Shells"
+if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
+	source "package/bash/Config.in"
+endif
+comment "Utilities"
+	source "package/dialog/Config.in"
+endmenu
+
+menu "System tools"
+	source "package/rcorder/Config.in"
+	source "package/acl/Config.in"
+	source "package/attr/Config.in"
+if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
+	source "package/coreutils/Config.in"
+endif
+	source "package/kmaps/Config.in"
+	source "package/pkgsrc/Config.in"
+if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
+	source "package/procps-ng/Config.in"
+endif
+	source "package/util-linux/Config.in"
+
+endmenu
+endmenu

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_KMAPS
+	bool "kmaps"
+	help
+          TinyCore kmap files

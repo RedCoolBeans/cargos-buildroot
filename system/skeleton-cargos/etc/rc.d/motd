@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# $NetBSD: motd,v 1.9 2004/08/13 18:08:03 mycroft Exp $
+#
+
+# PROVIDE: motd
+# BEFORE:  LOGIN
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="motd"
+rcvar="update_motd"
+start_cmd="motd_start"
+stop_cmd=":"
+
+motd_start()
+{
+	#	Update kernel info in /etc/motd
+	#	Must be done *before* interactive logins are possible
+	#	to prevent possible race conditions.
+	#
+	echo "Updating motd."
+	if [ ! -f /etc/motd ]; then
+		install -c -o root -g wheel -m 664 /dev/null /etc/motd
+	fi
+	if T=`mktemp /tmp/_motd.XXXXXXXXXX`; then
+		uname -a | sed 1q > $T
+		echo "" >> $T
+		sed '1,/^$/d' < /etc/motd >> $T
+		cmp -s $T /etc/motd || cp $T /etc/motd
+		rm -f $T
+	fi
+}
+
+load_rc_config $name
+run_rc_command "$1"

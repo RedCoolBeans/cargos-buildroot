@@ -1,0 +1,4 @@
+config BR2_PACKAGE_RCORDER
+	bool "rcorder"
+	help
+          NetBSD rcorder(1)

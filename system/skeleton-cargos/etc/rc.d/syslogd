@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# $NetBSD: syslogd,v 1.15 2004/10/11 13:29:52 lukem Exp $
+#
+
+# PROVIDE: syslogd
+# REQUIRE: root
+# BEFORE:  SERVERS
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="syslogd"
+rcvar=$name
+command="/sbin/${name}"
+pidfile="/var/run/${name}.pid"
+extra_commands="reload"
+start_precmd=syslogd_precmd
+
+syslogd_precmd()
+{
+	if [ ! -f /var/log/lastlog ]; then
+		install -c -o root -g wheel -m 664 /dev/null /var/log/lastlog
+	fi
+}
+
+load_rc_config $name
+run_rc_command "$1"

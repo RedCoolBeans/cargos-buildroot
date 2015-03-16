@@ -1,0 +1,6 @@
+config BR2_PACKAGE_PKGSRC
+	bool "pkgsrc"
+	help
+	  pkgsrc bootstrap tarball
+
+	  http://www.pkgsrc.org/

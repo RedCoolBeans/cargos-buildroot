@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# $NetBSD: acpid,v 1.15 2004/10/11 13:29:52 lukem Exp $
+#
+
+# PROVIDE: acpid
+# REQUIRE: syslogd
+# BEFORE:  SERVERS
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="acpid"
+rcvar=$name
+command="/usr/sbin/${name}"
+pidfile="/var/run/${name}.pid"
+extra_commands="reload"
+
+load_rc_config $name
+run_rc_command "$1"

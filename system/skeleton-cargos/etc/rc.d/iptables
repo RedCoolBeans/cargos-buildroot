@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# $NetBSD: iptables,v 1.9 2004/08/13 18:08:03 mycroft Exp $
+#
+
+# PROVIDE: iptables
+# REQUIRE: network
+# BEFORE:  NETWORKING
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="iptables"
+start_cmd="iptables_start"
+stop_cmd="iptables_stop"
+
+iptables_start()
+{
+	echo "Loading iptables rules."
+	[ -f /etc/iptables.conf ] && \
+		iptables-restore < /etc/iptables.conf
+}
+
+iptables_stop()
+{
+	echo "Stopping iptables and removing all rules."
+	iptables -F
+	iptables -X
+	iptables -t nat -F
+	iptables -t nat -X
+	iptables -t mangle -F
+	iptables -t mangle -X
+	iptables -P INPUT ACCEPT
+	iptables -P FORWARD ACCEPT
+	iptables -P OUTPUT ACCEPT
+}
+
+load_rc_config $name
+run_rc_command "$1"

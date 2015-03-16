@@ -1,0 +1,85 @@
+#!/bin/sh
+#
+# $NetBSD: random_seed,v 1.7 2014/07/22 17:11:09 wiz Exp $
+#
+
+# PROVIDE: random_seed
+# BEFORE:  root
+# KEYWORD: shutdown
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="random_seed"
+rcvar=$name
+start_cmd="random_load"
+stop_cmd="random_save"
+restart_cmd=":"
+
+random_file="${random_file:-/etc/random-seed}"
+
+message()
+{
+	echo "${name}: ${random_file}: $@" 1>&2
+}
+
+random_seed()
+{
+	msg="$1"
+	oum="$(umask)"
+	umask 077
+
+	echo 2>/dev/null >>${random_file}
+	rm -f "${random_file}"
+
+	if [ -r /proc/sys/kernel/random/poolsize ]; then
+		dd if=/dev/urandom of=/etc/random-seed count=1 \
+			bs=$(expr $(cat /proc/sys/kernel/random/poolsize) / 8) \
+			>/dev/null 2>&1
+	else
+		dd if=/dev/urandom of=${random_file} count=1 bs=512 \
+			>/dev/null 2>&1
+	fi
+
+	ret=$?	
+
+	umask "${oum}"
+
+	return $ret
+}
+
+random_load()
+{
+	if [ ! -f "${random_file}" ]; then
+		message "Not present"
+		return
+	fi
+
+	set -- $(ls -ldn "${random_file}")
+	st_mode="$1" # should be "-rw-------"
+	st_uid="$3"  # should be "0" for root
+
+	# The file must be owned by root,
+	if [ "$st_uid" != "0" ]; then
+		message "Bad owner ${st_uid}"
+		return 1
+	fi
+	# and root read/write only.
+	if [ "$st_mode" != "-rw-------" ]; then
+		message "Bad mode ${st_mode}"
+		return 1
+	fi
+
+	[ -f ${random_file} ] && cat ${random_file} > /dev/urandom
+	[ $? -eq 0 ] && echo "Loaded entropy from ${random_file}."
+
+	random_seed
+}
+
+random_save()
+{
+	random_seed && echo "Saved entropy to ${random_file}."
+}
+
+
+load_rc_config "${name}"
+run_rc_command "$1"

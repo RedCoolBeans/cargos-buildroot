@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# $NetBSD: mountall,v 1.9 2014/07/22 17:11:09 wiz Exp $
+#
+
+# KEYWORD: interactive
+# PROVIDE: mountall
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="mountall"
+start_cmd=":"
+stop_cmd="mountall_stop"
+
+mountall_stop()
+{
+	echo 'Unmounting all file systems...'
+	umount -a
+}
+
+load_rc_config $name
+run_rc_command "$1"
