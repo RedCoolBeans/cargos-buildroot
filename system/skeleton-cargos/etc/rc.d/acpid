@@ -5,14 +5,13 @@
 
 # PROVIDE: acpid
 # REQUIRE: syslogd
-# BEFORE:  SERVERS
+# BEFORE:  SERVERS sysctl
 
 $_rc_subr_loaded . /etc/rc.subr
 
 name="acpid"
 rcvar=$name
-command="/usr/sbin/${name}"
-pidfile="/var/run/${name}.pid"
+command="/sbin/${name}"
 extra_commands="reload"
 
 load_rc_config $name
