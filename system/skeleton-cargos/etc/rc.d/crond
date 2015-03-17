@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# $NetBSD: crond,v 1.15 2004/10/11 13:29:52 lukem Exp $
+#
+
+# PROVIDE: crond
+# REQUIRE: syslogd
+# BEFORE:  SERVERS sysctl
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="crond"
+rcvar=$name
+command="/usr/sbin/${name}"
+extra_commands="reload"
+
+load_rc_config $name
+run_rc_command "$1"

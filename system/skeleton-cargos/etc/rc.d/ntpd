@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# $NetBSD: ntpd,v 1.15 2004/10/11 13:29:52 lukem Exp $
+#
+
+# PROVIDE: ntpd
+# REQUIRE: NETWORKING
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="ntpd"
+rcvar=$name
+command="/usr/sbin/${name}"
+extra_commands="reload"
+
+load_rc_config $name
+run_rc_command "$1"
