@@ -40,9 +40,4 @@ else
 EUDEV_CONF_OPTS += --disable-gudev
 endif
 
-# Required by default rules for input devices
-define EUDEV_USERS
-	- - input -1 * - - - Input device group
-endef
-
 $(eval $(autotools-package))
