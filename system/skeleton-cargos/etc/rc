@@ -64,7 +64,6 @@ rc_preprocess()
 			fi
 		done
 	)
-	(cd /var/spool; ln -sf /usr/pkg/var/spool/mail mail)
 }
 
 rc_preprocess
