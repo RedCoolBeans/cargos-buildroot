@@ -23,7 +23,6 @@ rc_preprocess()
 
 	echo > /sys/kernel/uevent_helper
 
-
 	UDEV_ROOT=/dev \
 		udevd --daemon --resolve-names=never
 
@@ -64,6 +63,27 @@ rc_preprocess()
 			fi
 		done
 	)
+
+	for i in $(cat /proc/cmdline); do
+		case $i in
+			*=*)
+				case $i in
+					console*) _serial=${i#*=} ;;
+				esac
+			;;
+                esac
+        done
+
+	if [ -z $_serial ]; then
+		/bin/sed -i -e \
+			"/# GENERIC_SERIAL$/s~^.*#~#ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100 #~" \
+			/etc/inittab
+	else
+		/bin/sed -i -e \
+			"/# GENERIC_SERIAL$/s~^.*#~${_serial}::respawn:/sbin/getty -L ${_serial} 115200 vt100 #~" \
+			/etc/inittab
+	fi
+	/bin/kill -HUP 1
 }
 
 rc_preprocess

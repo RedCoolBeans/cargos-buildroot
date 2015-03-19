@@ -17,7 +17,7 @@
 ::sysinit:-/etc/rc
 
 # Put a getty on the serial port
-ttyS0::respawn:/sbin/getty -L  ttyS0 115200 vt100 # GENERIC_SERIAL
+#ttyS0::respawn:/sbin/getty -L ttyS0 115200 vt100 # GENERIC_SERIAL
 tty1::respawn:/sbin/getty -L tty1 38400
 tty2::respawn:/sbin/getty -L tty2 38400
 tty3::respawn:/sbin/getty -L tty3 38400
