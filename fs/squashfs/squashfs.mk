@@ -31,7 +31,7 @@ define ROOTFS_SQUASHFS_CMD
 endef
 
 define ROOTFS_SQUASHFS_NOINST_CMD
-	$(HOST_DIR)/usr/bin/mksquashfs $(TARGET_DIR) ${@}-noinst -noappend -e var/db/bootstrap-cargos-x86_64-$(BR2_VERSION).tar.gz \
+	$(HOST_DIR)/usr/bin/mksquashfs $(TARGET_DIR) ${@}-noinst -noappend -e var/db/bootstrap-cargos-$(BR2_VERSION)-x86_64.tar.gz \
 		$(ROOTFS_SQUASHFS_ARGS) && \
 	chmod 0644 ${@}-noinst
 endef
