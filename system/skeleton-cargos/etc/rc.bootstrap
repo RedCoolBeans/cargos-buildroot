@@ -389,7 +389,7 @@ prompt_localboot() {
 	local _message="
 	Would you like to be able to boot CargOS from your local disks?
 	A working internet connection is mandatory to do this!
-	First wget(1) will be installed with pkgin(1).
+	First wget and grub2 will be installed with pkgin(1).
 	"
 	dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
 		--title "Support boot from local disk(s)?" \
@@ -420,7 +420,7 @@ EOF
 
 	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y up >/dev/null"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget >/dev/null"
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2 >/dev/null"
 	((_c_cnt++))
 	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -qO /tmp/rootfs.squashfs-noinst-${_version} http://www.cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}"
 	((_c_cnt++))
