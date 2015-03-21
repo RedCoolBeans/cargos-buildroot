@@ -22,7 +22,7 @@ most of which are normally already installed:
 
 Then proceed to build CargOS:
 
-1. run 'make cargos_defconfig'
+1. run 'make cargos_x86_defconfig'
 2. run 'make'
 3. wait while it compiles
 
