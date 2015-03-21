@@ -1,0 +1,190 @@
+#!/bin/sh
+#
+# Copyright (c) 2015 Red Cool Beans
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Author: Robert Nagy <robert@redcoolbeans.com>
+
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export PATH
+
+export TERM=xterm-color
+
+usage() {
+	echo
+	echo "Usage: ${0##*/} [-n]" >&2
+	echo
+	echo "Options:"
+	echo "  -n    dry-run mode, only report what would be done"
+	echo
+	exit 1
+}
+
+pr_error() {
+	echo "!!! ${@}"
+	exit 1
+}
+
+if [ "$(id -u)" -ne 0 ]; then
+	pr_error "Need root privileges to run this script"
+	usage
+fi
+
+_TMPDIR=$(mktemp -d) || exit 1
+_PID="/var/run/${0##*/}.pid"
+
+trap "bye_bye" 0 1 2 5 15
+
+bye_bye() {
+	umount -f /boot 2>/dev/null
+	rm -rf ${_TMPDIR} ${_PID}
+	exit 1
+}
+
+cmd_exe() {
+	if [ -z "${dryrun}" ]; then
+		"${@}"
+	fi
+}
+
+while getopts 'n' arg; do
+	case ${arg} in
+	n)	dryrun=" (dry run)" ;;
+	*)	usage ;;
+	esac
+done
+[ $# = $(($OPTIND-1)) ] || usage
+
+if [ -f ${_PID} ]; then
+	pr_error "${0##*/} is already running ($(cat ${_PID})):"
+fi
+
+echo $$ >${_PID}
+
+_wget=$(which wget) || _wget="/usr/pkg/bin/wget"
+_grub_install=$(which grub-install) || _grub_install="/usr/pkg/sbin/grub-install"
+
+if [ ! -e ${_wget} ]; then
+	pr_error "${0##*/} needs wget to be installed, please issue 'pkgin in wget' to install."
+fi
+
+if [ ! -e ${_grub_install} ]; then
+	pr_error "${0##*/} needs grub2 to be installed: please issue 'pkgin in grub2' to install."
+fi
+
+_rver=$(${_wget} -qO - http://cargos.io/x86_64/current)
+_cver=$(cat /etc/cargos-release)
+
+if [ X"${_rver}" == X"${_cver}" ]; then
+	_message="
+	Your CargOS installation on the disk(s) is up-to-date!
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Upgrade Utility" \
+		--msgbox "${_message}" 7 60
+	clear && exit 0
+else
+	_message="
+	Do you want to proceed with the upgrade?!
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Upgrade Utility" \
+		--yesno "${_message}" 7 60
+	[ $? -gt 0 ] && exit 0
+fi
+
+clear
+
+cmd_exe cat << EOF > /tmp/grub.cfg
+set menu_color_normal=cyan/blue
+set menu_color_highlight=white/blue
+set timeout=10
+
+menuentry 'CargOS-${_rver}' {
+    set background_color=black
+    linux    /bzImage-${_rver} root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_rver}
+}
+menuentry 'CargOS-${_cver}' {
+    set background_color=black
+    linux    /bzImage-${_cver} root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_cver}
+}
+menuentry 'CargOS-${_rver} with serial console on ttyS0' {
+    set background_color=black
+    linux    /bzImage-${_rver} console=ttyS0 root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_rver}
+}
+menuentry 'CargOS-${_cver} with serial console on ttyS0' {
+    set background_color=black
+    linux    /bzImage-${_cver} console=ttyS0 root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_cver}
+}
+EOF
+
+_rver=2015.6
+for _version in ${_rver} ${_cver}; do
+	echo
+	echo -n "* Downloading root filesystem for ${_version} ... "
+	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/rootfs.squashfs-noinst-${_version} \
+		http://cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}
+	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+	echo
+	echo -n "* Downloading kernel image for ${_version} ... "
+	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/bzImage-${_version} \
+		http://cargos.io/x86_64/${_version}/bzImage-${_version}
+	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+done
+
+for i in $(btrfs fi show | grep path | awk '{print $8}'); do
+	_disk=$(echo $i | tr -d '[[:digit:]]')
+	echo
+	echo -n "* Running filesystem check on ${_disk}1... "
+	cmd_exe fsck.ext4 -p ${_disk}1 >/dev/null
+	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+	cmd_exe mount -t ext4 ${_disk}1 /boot
+	[ -z "${dryrun}" ] && if [ ! -e /boot/grub/grub2.cfg ]; then
+		cmd_exe umount /boot
+		dialog --backtitle "${TITLE_PREFIX}" \
+			--title "CargOS Upgrade Utility" \
+			--msgbox "
+				CargOS is not configured to boot from disk(s)." 7 60
+		clear && exit 1
+	fi
+	echo
+	echo -n "* Installing grub boot loader to ${_disk} ... "
+	cmd_exe /usr/pkg/sbin/grub-install -f ${_disk} 2>/dev/null
+	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+	cmd_exe cp /tmp/grub.cfg /boot/grub/grub.cfg
+	for _version in ${_rver} ${_cver}; do
+		echo
+		echo -n "* Installing root filesystem for ${_version} to ${_disk} ... "
+		cmd_exe cp /tmp/rootfs.squashfs-noinst-${_version} /boot/
+		[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+		echo
+		echo -n "* Installing kernel for ${_version} to ${_disk} ... "
+		cmd_exe cp /tmp/bzImage-${_version} /boot/
+		[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
+	done
+
+	# clean up old rootfs and kernel files
+	[ -z "${dryrun}" ] && find /boot ! -name "*${_cver}*" -a ! -name "*${_rver}*" -maxdepth 1 -type f -exec rm {} \;
+	cmd_exe umount /boot
+done
+
+cmd_exe rm -f /tmp/bzImage-${_cver} /tmp/rootfs.squashfs-noinst-${_cver} /tmp/grub.cfg
+
+rm -rf ${_TMPDIR}
+rm ${_PID}
