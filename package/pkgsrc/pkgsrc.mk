@@ -5,8 +5,8 @@
 ################################################################################
 
 PKGSRC_VERSION = $(BR2_VERSION)
-PKGSRC_SOURCE = bootstrap-cargos-$(BR2_VERSION)-x86_64.tar.gz
-PKGSRC_SITE = http://cargos.io/x86_64/bootstrap/
+PKGSRC_SOURCE = bootstrap-cargos-$(BR2_VERSION)-$(BR2_ARCH).tar.gz
+PKGSRC_SITE = http://cargos.io/$(BR2_ARCH)/bootstrap/
 PKGSRC_DEPENDENCIES = busybox
 PKGSRC_LICENSE = BSD
 
