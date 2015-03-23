@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PATH=/sbin:/bin:/usr/sbin:/usr/bin
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/pkg/bin
 export PATH
 
 export TERM=xterm-color
@@ -176,7 +176,7 @@ create_network_config() {
 	else
 		echo "ifconfig_${_snic}=\"$_ipaddr\"" >> /etc/rc.conf
 	fi
-	/etc/rc.d/network start >/dev/null 2>&1
+	/etc/rc.d/network start >> ${_install_log} 2>&1
 }
 
 prompt_nic() {
@@ -294,12 +294,15 @@ create_persistent() {
 		echo ${_pct}
 		case ${f} in
 		fdisk)
+			{
 			for dev in ${_sdisks}; do
-				echo -n "o.n.p.1..+1024M.a.1.n.p.2...w." | tr . "\n" | fdisk ${dev} >/dev/null 2>&1
+				echo -n "o.n.p.1..+1024M.a.1.n.p.2...w." | tr . "\n" | fdisk ${dev}
 			done
+			} >> ${_install_log} 2>&1
 			;;
 		mkfs_btrfs)
-			mkfs.btrfs -L cargos ${_parts} >/dev/null 2>&1
+			{
+			mkfs.btrfs -L cargos ${_parts}
 			local _uuid=$(btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
 			mount /dev/disk/by-uuid/$_uuid /mnt
 			(cd /mnt; btrfs subvolume create root)
@@ -309,13 +312,17 @@ create_persistent() {
 			(cd /mnt; btrfs subvolume create data)
 			(cd /mnt; btrfs subvolume create data/docker)
 			umount -f /mnt
+			} >> ${_install_log} 2>&1
 			;;
 		mkfs_boot)
+			{
 			for dev in ${_sdisks}; do
-				mkfs.ext4 ${dev}1 >/dev/null 2>&1
+				mkfs.ext4 ${dev}1
 			done
+			} >> ${_install_log} 2>&1
 			;;
 		mount)
+			{
 			local _uuid=$(btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
 			mount /dev/disk/by-uuid/$_uuid /cargos
 			mount -o subvol=pkg /dev/disk/by-uuid/$_uuid /usr/pkg
@@ -324,17 +331,22 @@ create_persistent() {
 			mount -o subvol=home /dev/disk/by-uuid/$_uuid /home
 			mount -o subvol=data/docker /dev/disk/by-uuid/$_uuid /var/lib/docker
 			unionfs -o allow_other,cow,use_ino,nonempty /cargos/etc=RW:/.etc=RO /etc
+			} >> ${_install_log} 2>&1
 			;;
 		bootstrap)
+			{
 			local _version=$(cat /etc/cargos-release)
-			/bin/gzip -d < /var/db/bootstrap-cargos-x86_64-${_version}.tar.gz | /bin/tar xhf - -C /
-			/bin/bash /usr/pkg/.install/bootstrap.sh >/dev/null 2>&1
+			/bin/gzip -d < /var/db/bootstrap-cargos-${_version}-x86_64.tar.gz | /bin/tar xhf - -C /
+			/bin/bash /usr/pkg/.install/bootstrap.sh
 			rm -rf /usr/pkg/.install
+			} >> ${_install_log} 2>&1
 			;;
 		random-seed)
+			{
 			(dmesg; sysctl -a; ifconfig -a; df; hostname) >/dev/urandom 2>&1
 			dd if=/dev/urandom of=/etc/random-seed bs=512 count=1 2>/dev/null
 			chmod 600 /etc/random-seed
+			} >> ${_install_log} 2>&1
 			;;
 		esac
 	done | \
@@ -418,19 +430,21 @@ EOF
 	local _cmds
 	local _c_cnt=0
 
-	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y up >/dev/null"
+	_cmds[$_c_cnt]="source /etc/profile.d/pkg.sh"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2 >/dev/null"
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y up"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -qO /tmp/rootfs.squashfs-noinst-${_version} http://www.cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}"
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -qO /tmp/bzImage-${_version} http://www.cargos.io/x86_64/${_version}/bzImage-${_version}"
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/rootfs.squashfs-noinst-${_version} http://www.cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}"
+	((_c_cnt++))
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/bzImage-${_version} http://www.cargos.io/x86_64/${_version}/bzImage-${_version}"
 
 	for _disk in ${_sdisks}; do
 		((_c_cnt++))
 		_cmds[$_c_cnt]="mount -t ext4 ${_disk}1 /boot"
 		((_c_cnt++))
-		_cmds[$_c_cnt]="/usr/pkg/sbin/grub-install -f ${_disk} 2>/dev/null"
+		_cmds[$_c_cnt]="/usr/pkg/sbin/grub-install -f ${_disk}"
 		((_c_cnt++))
 		_cmds[$_c_cnt]="cp /tmp/grub.cfg /boot/grub/grub.cfg"
 		((_c_cnt++))
@@ -447,7 +461,7 @@ EOF
 	do
 		local _pct=$(( 100*(++i)/n ))
 		echo ${_pct}
-		eval $f
+		eval $f >> ${_install_log} 2>&1
 	done | \
 	dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
 		--title "Installing grub and current CargOS release on each disk's boot partition" \
