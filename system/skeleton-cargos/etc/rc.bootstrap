@@ -406,11 +406,15 @@ prompt_localboot() {
 	dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
 		--title "Support boot from local disk(s)?" \
 		--yesno "${_message}" 9 70
-	[ $? -ne 0 ] && return 0
+	[ $? -ne 0 ] && return 1
+    return 0
+}
 
+do_localboot() {
+    local _use_dialog="$1"
 	local _version=$(cat /etc/cargos-release)
 
-	cat << EOF > /tmp/grub.cfg
+	/bin/cat << EOF > /tmp/grub.cfg
 set menu_color_normal=cyan/blue
 set menu_color_highlight=white/blue
 set timeout=10
@@ -455,6 +459,16 @@ EOF
 		_cmds[$_c_cnt]="umount /boot"
 	done
 
+    local _progressbar_cmd='/bin/cat > /dev/null'
+    local _error_dialog='echo "Failed to install boot image(s)!!!"  >> ${_install_log}'
+    if [ ${_use_dialog} = 'yes' ] ; then
+	    _progressbar_cmd='dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" 
+		    --title "Installing grub and current CargOS release on all disks." 
+		    --gauge "Please wait..." 10 80'
+        _error_dialog='dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" 
+			--title "CargOS Setup Utility" 
+			--msgbox "Failed to install boot image(s)!!!" 7 75'
+    fi
 	n=${#_cmds[*]}; 
 	i=0
 	for f in "${_cmds[@]}"
@@ -462,16 +476,11 @@ EOF
 		local _pct=$(( 100*(++i)/n ))
 		echo ${_pct}
 		eval $f >> ${_install_log} 2>&1
-	done | \
-	dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
-		--title "Installing grub and current CargOS release on each disk's boot partition" \
-		--gauge "Please wait..." 10 80
+	done | eval ${_progressbar_cmd}
 
 	test -s /tmp/bzImage-${_version} -a -s /tmp/rootfs.squashfs-noinst-${_version} || \
-		dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
-			--title "CargOS Setup Utility" \
-			--msgbox "Failed to install boot image(s)!!!" 7 75
-			
+        eval ${_error_dialog}
+
 	rm -f /tmp/bzImage-${_version} /tmp/rootfs.squashfs-noinst-${_version} /tmp/grub.cfg
 }
 
@@ -684,6 +693,7 @@ while [ /usr/bin/true ]; do
 		_hostname=$(ip link show ${_snic} | grep link | cut -d ' ' -f6 | sed 's/:/-/g')
 		create_persistent
 		create_network_config
+        do_localboot no
 		handle_cloud
 	else
 		prompt_welcome
@@ -696,7 +706,7 @@ while [ /usr/bin/true ]; do
 		while true ; do change_root_password && break ; done
 		set_timezone
 		save_kmap
-		prompt_localboot
+		prompt_localboot && do_localboot yes || :
 	fi
 
 	/etc/rc.d/network stop >/dev/null 2>&1
