@@ -595,8 +595,18 @@ set_timezone() {
 	rm -f ${_zonefile}
 }
 
+get_ec2()
+{
+	local _tmpf=$(mktemp 2>/dev/null)
+	/usr/pkg/bin/wget -T5 -t5 $1 -O http://169.254.169.254/${_tmpf} >> ${_install_log} 2>&1
+	local _ret=$(cat ${_tmpf})
+	echo ${_ret}
+}
+
 handle_cloud()
 {
+	local _public_key
+
 	CS=/tmp/$RANDOM$RANDOM.cinit
 	rm -f $CS
 
@@ -611,16 +621,40 @@ handle_cloud()
 		elif [ -f $CS.rom/openstack/latest/user-data ]; then
 			cp $CS.rom/openstack/latest/user-data $CS
 		fi
+
+		[ -f $CS.rom/ec2/latest/meta-data/hostname ] && _hostname=$(cat $CS.rom/ec2/latest/meta-data/hostname)
+		[ -f $CS.rom/ec2/latest/meta-data/public-keys/0/openssh-key ] && _public_key=$(cat $CS.rom/ec2/latest/meta-data/public-keys/0/openssh-key)
+
 		umount $CS.rom
 	done
 	rmdir $CS.rom
 
 	if [ ! -f $CS ]; then
-		/usr/pkg/bin/wget -T5 -t5 http://169.254.169.254/latest/user-data -q -O $CS &>/dev/null
+		source /etc/profile.d/pkg.sh
+		/usr/pkg/bin/pkgin -y up >> ${_install_log} 2>&1
+		/usr/pkg/bin/pkgin -y in wget >> ${_install_log} 2>&1
+		/usr/pkg/bin/wget -T5 -t5 http://169.254.169.254/latest/user-data -O $CS >> ${_install_log} 2>&1
+
+		_hostname=$(get_ec2 "latest/meta-data/hostname")
+		_public_key=$(get_ec2 "latest/meta-data/public-keys/0/openssh-key")
 	fi
-	
+
+	# If hostname is empty, use CargOS defaults
+	[ -z ${_hostname} ] && _hostname=$(ip link show ${_snic} | grep link | cut -d ' ' -f6 | sed 's/:/-/g')
+
+	if [[ ! -z ${_public_key} ]]; then
+		AUTHORIZED_KEYS=/root/.ssh/authorized_keys
+		if [ ! -d `dirname $AUTHORIZED_KEYS` ]; then
+			mkdir -p -m 700 `dirname $AUTHORIZED_KEYS`
+		fi
+		echo ${_public_key} > $AUTHORIZED_KEYS
+		if [ -f $AUTHORIZED_KEYS ]; then
+			chmod 600 $AUTHORIZED_KEYS
+		fi
+	fi
+
 	# If user data is not provided, nothing to be done
-	[[ ! -s $CS ]] && return 1
+	[[ ! -s $CS ]] && rm -f $CS && return 1
 
 	# Decode user data (if not already decoded)
 	if ! [[ "`head -c 12 $CS`" == "Content-Type" || "`head -c 1 $CS`" == "#" ]]; then
@@ -681,10 +715,16 @@ while [ /usr/bin/true ]; do
 	if is_cloud; then
 		_sdisks=$(fdisk -l | grep Disk | grep byte | cut -d ' ' -f2 | tr -d ':')
 		_snic=$(ip link show | grep -v link | grep -v LOOPBACK | cut -d ' ' -f2 | tr -d ':' | head -1)
-		_hostname=$(ip link show ${_snic} | grep link | cut -d ' ' -f6 | sed 's/:/-/g')
+
 		create_persistent
-		create_network_config
+
+		# Use dhcp to pre-configure networking then fetch cloud configuration
+		# and kill networking
+		/sbin/udhcpc -i ${_snic} -p /var/run/udhcpc-${_snic}.pid
 		handle_cloud
+		kill $(cat /var/run/udhcpc-${_snic}.pid)
+
+		create_network_config
 	else
 		prompt_welcome
 		[ $? -ne 0 ] && exit 1
