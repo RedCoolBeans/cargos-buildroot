@@ -755,21 +755,21 @@ handle_cloud()
 		elif [ "$FIRST_LINE" == "#!/bin/sh" ]; then
 			sh $f
 		elif [ "$FIRST_LINE" == "#cloud-config" ]; then
+			# Handle bootcmd
+			while read -r line; do
+				eval $line
+			done < <(bootcmd $f)
+
 			# Handle chpasswd
 			local _chpasswd=$(mktemp 2>/dev/null)
 			chpasswd $f >${_chpasswd}
 			[ -z ${_chpasswd} ] || /usr/sbin/chpasswd < ${_chpasswd}
 			rm -f ${_chpasswd}
 
-			# Handle runcmd
+			# Handle runcmd, append to /etc/rc.local
 			while read -r line; do
-				eval $line
+				echo $line >> /etc/rc.local
 			done < <(runcmd $f)
-
-			# Handle bootcmd
-			while read -r line; do
-				eval $line
-			done < <(bootcmd $f)
 
 			# Handle users
 			ci_users $f
