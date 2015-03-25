@@ -28,6 +28,62 @@ _install_log="/tmp/install.log"
 
 _cloud=0
 
+ci_users() {
+	awk '
+		$1 ~ /^#/	{ next }
+		/users:/	{ flag=1; next }
+		/(^$|^(\w)+:)/	{ flag=0 }
+		flag
+	' $1 | \
+		awk -v RS="- name:" '{ if ($1 == "-") { next }; print $0 > "/tmp/user." NR }'
+
+	for _userf in $(ls -1 /tmp/user.*); do
+		_user=$(head -1 ${_userf} | tr -d '[[:space:]]')
+		_ssh_authorized_keys=""
+		_cnt=0
+
+		OLDIFS=$IFS
+		IFS=$'\n'
+		for i in $(cat ${_userf}); do
+			case $i in
+				*:*)
+					case $i in
+						*home*) _home=${i#*: } ;;
+						*passwd*) _passwd=${i#*: } ;;
+						*shell*) _shell=${i#*: } ;;
+						*gecos*) _gecos=${i#*: } ;;
+						*groups*) _groups=${i#*: } ;;
+						*ssh-authorized-keys*) _ssh_authorized_keys=${i#*: } ;;
+					esac
+				;;
+				*-\ ssh-*)
+					_ssh_authorized_keys[${_cnt}]=$(echo $i | sed "s,^[ \t]*- ,,g")
+					((_cnt++))
+				;;
+			esac
+		done
+		IFS=$OLDIFS
+		adduser -D ${_groups:+-G "${_groups}"} ${_home:+-h "${_home}"} ${_shell:+-s "${_shell}"} ${_gecos:+-g "${_gecos}"} ${_user}
+		[ -n "${_passwd}" ] && echo ${_user}:${_passwd} | /usr/sbin/chpasswd -e
+		if [ $_cnt -gt 0 ]; then
+			AUTHORIZED_KEYS=/home/${_user}/.ssh/authorized_keys
+			if [ ! -d `dirname $AUTHORIZED_KEYS` ]; then
+				mkdir -p -m 700 `dirname $AUTHORIZED_KEYS`
+			fi
+			_i=0
+			while ((_i < $_cnt)); do
+				echo ${_ssh_authorized_keys[$_i]} >> $AUTHORIZED_KEYS
+				((_i++))
+			done
+			if [ -f $AUTHORIZED_KEYS ]; then
+				chown -R ${_user} `dirname $AUTHORIZED_KEYS`
+				chmod 600 $AUTHORIZED_KEYS
+			fi
+		fi
+		rm -f ${_userf}
+	done
+}
+
 chpasswd() {
 	awk '
 		/chpasswd/		{ next; }
@@ -715,6 +771,8 @@ handle_cloud()
 				eval $line
 			done < <(bootcmd $f)
 
+			# Handle users
+			ci_users $f
 		fi
 		rm ${CS}
 	done
