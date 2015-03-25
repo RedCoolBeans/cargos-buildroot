@@ -30,7 +30,8 @@ menuentry 'CargOS-${_version} with serial console on ttyS0' {
 }
 EOF
 
-		grub-mkrescue -o cargos${_rel}${_c}-${_version}.iso ${_tmp}
+		GMR=`which grub-mkrescue 2>/dev/null`; test -n "${GMR}" || GMR=`which grub2-mkrescue 2>/dev/null`
+		${GMR} -o cargos${_rel}${_c}-${_version}.iso ${_tmp}
 		qemu-img convert -O qcow2 cargos${_rel}${_c}-${_version}.iso cargos${_rel}${_c}-${_version}.qcow2
 
 		rm -rf ${_tmp}/* && rmdir ${_tmp}
