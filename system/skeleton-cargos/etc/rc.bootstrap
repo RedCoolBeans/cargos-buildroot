@@ -36,6 +36,51 @@ disable_root() {
 	return 1
 }
 
+ci_groups() {
+	OLDIFS=$IFS
+	IFS=$'\n'
+        for i in $(awk '
+		$1 ~ /^#/	{ next }
+                /groups:/	{ flag=1; next; }
+                /^(\w)+/	{ flag=0; next; }
+                flag
+        ' $1); do
+		case $i in
+			*-\ *:*)
+				local _gu=${i#*: }
+				local _g=${i#*- }
+				_g=${_g%:*}
+				local _g_status=0
+				if [[ $_gu == [* ]]; then
+					IFS=',' read -a _gu <<< "$_gu"
+					for _gu_entry in "${_gu[@]}"; do
+						_gu_entry=$(echo $_gu_entry | sed "s,^[ \t]*,,g")
+						_gu_entry=${_gu_entry%\]}
+						_gu_entry=${_gu_entry#\[}
+						_gu_entry=${_gu_entry%\"}
+						_gu_entry=${_gu_entry#\"}
+						_gu_entry=${_gu_entry%\'}
+						_gu_entry=${_gu_entry#\'}
+						if [ ${_g_status} -eq 0 ]; then
+							addgroup ${_g}
+							_g_status=1
+						fi
+						echo ${_g} >> /tmp/groups.${_gu_entry}
+					done
+				else
+					if [ ${_g_status} -eq 0 ]; then
+						addgroup ${_g}
+						_g_status=1
+					fi
+					echo ${_g} >> /tmp/groups.${_gu}
+				fi
+				;;
+			*-\ *) addgroup ${i#*- } ;;
+		esac
+	done
+	IFS=$OLDIFS
+}
+
 ci_users() {
 	awk '
 		$1 ~ /^#/	{ next }
@@ -73,6 +118,13 @@ ci_users() {
 			esac
 		done
 		IFS=$OLDIFS
+
+		# Handle group settings from ci_groups()
+		if [ -e "/tmp/groups.${_user}" ]; then
+			_groups="${_groups:+${_groups},}$(cat /tmp/groups.${_user} | paste -s -d,)"
+			rm -f /tmp/groups.${_user}
+		fi
+
 		adduser -D ${_groups:+-G "${_groups}"} ${_home:+-h "${_home}"} ${_shell:+-s "${_shell}"} ${_gecos:+-g "${_gecos}"} ${_user}
 		[ $? -gt 0 ] && rm -f ${_userf} && continue
 	
@@ -813,6 +865,9 @@ handle_cloud()
 			while read -r line; do
 				echo $line >> /etc/rc.local
 			done < <(runcmd $f)
+
+			# Handle groups
+			ci_groups $f
 
 			# Handle users
 			ci_users $f
