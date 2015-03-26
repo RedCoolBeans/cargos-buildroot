@@ -45,6 +45,7 @@ ci_users() {
 	' $1 | \
 		awk -v RS="- name:" '{ if ($1 == "-") { next }; print $0 > "/tmp/user." NR }'
 
+	_sudo_status=0
 	for _userf in $(ls -1 /tmp/user.*); do
 		_user=$(head -1 ${_userf} | tr -d '[[:space:]]')
 		[ -z $_user ] && rm -f ${_userf} && continue
@@ -74,10 +75,23 @@ ci_users() {
 		IFS=$OLDIFS
 		adduser -D ${_groups:+-G "${_groups}"} ${_home:+-h "${_home}"} ${_shell:+-s "${_shell}"} ${_gecos:+-g "${_gecos}"} ${_user}
 		[ $? -gt 0 ] && rm -f ${_userf} && continue
-		[ -n "${_passwd}" ] && echo ${_user}:${_passwd} | /usr/sbin/chpasswd -e
+	
+		# Set the specified password, if there is none, set a random one.	
+		if [ -n "${_passwd}" ]; then
+			echo ${_user}:${_passwd} | /usr/sbin/chpasswd -e
+		else
+			echo "${_user}:$(tr -cd '[:alnum:]' < /dev/urandom | fold -w30 | head -n1)" | /usr/sbin/chpasswd
+		fi
+
 		if [ -n "${_sudo}" ]; then
-			source /etc/profile.d/pkg.sh
-			/usr/pkg/bin/pkgin -y in sudo
+			if [ ${_sudo_status} -eq 0 ]; then
+				source /etc/profile.d/pkg.sh
+				/usr/pkg/bin/pkgin -y in sudo
+
+				# Lock the root user if there is a regular user configured with sudo rights
+				disable_root $1 && passwd -l root
+				_sudo_status=1
+			fi
 			if [[ $_sudo == [* ]]; then
 				IFS=',' read -a _sudo <<< "$_sudo"
 				for _sudo_entry in "${_sudo[@]}"; do
@@ -111,9 +125,6 @@ ci_users() {
 		fi
 		rm -f ${_userf}
 	done
-
-	# Lock the root user
-	disable_root $1 && passwd -l root
 }
 
 chpasswd() {
