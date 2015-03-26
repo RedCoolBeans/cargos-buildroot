@@ -78,7 +78,21 @@ ci_users() {
 		if [ -n "${_sudo}" ]; then
 			source /etc/profile.d/pkg.sh
 			/usr/pkg/bin/pkgin -y in sudo
-			echo "${_user} ${_sudo}" > /usr/pkg/etc/sudoers.d/${_user}
+			if [[ $_sudo == [* ]]; then
+				IFS=',' read -a _sudo <<< "$_sudo"
+				for _sudo_entry in "${_sudo[@]}"; do
+					_sudo_entry=$(echo $_sudo_entry | sed "s,^[ \t]*,,g")
+					_sudo_entry=${_sudo_entry%\]}
+					_sudo_entry=${_sudo_entry#\[}
+					_sudo_entry=${_sudo_entry%\"}
+					_sudo_entry=${_sudo_entry#\"}
+					_sudo_entry=${_sudo_entry%\'}
+					_sudo_entry=${_sudo_entry#\'}
+					echo "${_user} ${_sudo_entry}" >> /usr/pkg/etc/sudoers.d/${_user}
+				done
+			else
+				echo "${_user} ${_sudo}" > /usr/pkg/etc/sudoers.d/${_user}
+			fi
 		fi
 		if [ $_cnt -gt 0 ]; then
 			AUTHORIZED_KEYS=/home/${_user}/.ssh/authorized_keys
