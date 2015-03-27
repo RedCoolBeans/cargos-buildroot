@@ -780,7 +780,7 @@ set_timezone() {
 get_ec2()
 {
 	local _tmpf=$(mktemp 2>/dev/null)
-	/usr/pkg/bin/wget -T5 -t5 $1 -O ${_ec2_special_url}/${_tmpf} >> ${_install_log} 2>&1
+	/usr/pkg/bin/wget -T5 -t5 ${_ec2_special_url}/$1 -O ${_tmpf} >> ${_install_log} 2>&1
 	local _ret=$(cat ${_tmpf})
 	echo ${_ret}
 }
