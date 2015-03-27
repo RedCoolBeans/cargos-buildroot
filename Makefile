@@ -434,7 +434,7 @@ world: target-post-image
 
 .PHONY: all world toolchain dirs clean distclean source outputmakefile \
 	legal-info legal-info-prepare legal-info-clean printvars \
-	target-finalize target-post-image \
+	target-finalize target-post-image check-skeleton \
 	$(TARGETS) $(TARGETS_ROOTFS) \
 	$(TARGETS_DIRCLEAN) $(TARGETS_SOURCE) $(TARGETS_LEGAL_INFO) \
 	$(BUILD_DIR) $(STAGING_DIR) $(TARGET_DIR) \
@@ -486,7 +486,10 @@ $(BUILD_DIR)/.root:
 	@ln -snf lib $(TARGET_DIR)/usr/$(LIB_SYMLINK)
 	touch $@
 
-$(TARGET_DIR): $(BUILD_DIR)/.root
+$(TARGET_DIR): check-skeleton $(BUILD_DIR)/.root
+
+check-skeleton:
+	test -z "$(shell find $(TARGET_SKELETON) -newer $(BUILD_DIR)/.root -type f)" || rm -f $(BUILD_DIR)/.root
 
 STRIP_FIND_CMD = find $(TARGET_DIR)
 ifneq (,$(call qstrip,$(BR2_STRIP_EXCLUDE_DIRS)))
