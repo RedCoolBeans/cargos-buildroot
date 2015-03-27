@@ -27,8 +27,29 @@ _sec_ns="208.67.222.222"
 _install_log="/tmp/install.log"
 
 _cloud=0
+_ec2_special_url="http://169.254.169.254/"
+_cargos_mirror="http://www.cargos.io/$(uname -m)/"
 
-disable_root() {
+ci_packages() {
+	OLDIFS=$IFS
+	IFS=$'\n'
+        for i in $(awk '
+		$1 ~ /^#/	{ next }
+                /packages:/	{ flag=1; next; }
+                /^(\w)+/	{ flag=0; next; }
+                flag
+        ' $1); do
+		case $i in
+			*-\ *)
+				source /etc/profile.d/pkg.sh
+				/usr/pkg/bin/pkgin -y in ${i#*- }
+			;;
+		esac
+	done
+	OLDIFS=$IFS
+}
+
+ci_disable_root() {
 	local _ret=$(awk '
 		/disable_root:/	{ print $2; }
 		' $1 | tr '[:upper:]' '[:lower:]')
@@ -141,7 +162,7 @@ ci_users() {
 				/usr/pkg/bin/pkgin -y in sudo
 
 				# Lock the root user if there is a regular user configured with sudo rights
-				disable_root $1 && passwd -l root
+				ci_disable_root $1 && passwd -l root
 				_sudo_status=1
 			fi
 			if [[ $_sudo == [* ]]; then
@@ -602,9 +623,9 @@ EOF
 	((_c_cnt++))
 	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/rootfs.squashfs-noinst-${_version} http://www.cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}"
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/rootfs.squashfs-noinst-${_version} ${_cargos_mirror}/${_version}/rootfs.squashfs-noinst-${_version}"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/bzImage-${_version} http://www.cargos.io/x86_64/${_version}/bzImage-${_version}"
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/bzImage-${_version} ${_cargos_mirror}/${_version}/bzImage-${_version}"
 
 	for _disk in ${_sdisks}; do
 		((_c_cnt++))
@@ -759,7 +780,7 @@ set_timezone() {
 get_ec2()
 {
 	local _tmpf=$(mktemp 2>/dev/null)
-	/usr/pkg/bin/wget -T5 -t5 $1 -O ${_tmpf} http://169.254.169.254/$1 >> ${_install_log} 2>&1
+	/usr/pkg/bin/wget -T5 -t5 $1 -O ${_ec2_special_url}/${_tmpf} >> ${_install_log} 2>&1
 	local _ret=$(cat ${_tmpf})
 	echo ${_ret}
 }
@@ -792,9 +813,9 @@ handle_cloud()
 
 	if [ ! -f $CS ]; then
 		source /etc/profile.d/pkg.sh
-		/usr/pkg/bin/pkgin -y up >> ${_install_log} 2>&1
-		/usr/pkg/bin/pkgin -y in wget >> ${_install_log} 2>&1
-		/usr/pkg/bin/wget -T5 -t5 http://169.254.169.254/latest/user-data -O $CS >> ${_install_log} 2>&1
+		/usr/pkg/bin/pkgin -y up
+		/usr/pkg/bin/pkgin -y in wget
+		/usr/pkg/bin/wget -T5 -t5 ${_ec2_special_url}/latest/user-data -O $CS
 
 		_hostname=$(get_ec2 "latest/meta-data/hostname")
 		_public_key=$(get_ec2 "latest/meta-data/public-keys/0/openssh-key")
@@ -871,6 +892,9 @@ handle_cloud()
 
 			# Handle users
 			ci_users $f
+
+			# Handle packages
+			ci_packages $f
 		fi
 		rm ${CS}
 	done
@@ -884,11 +908,13 @@ while [ /usr/bin/true ]; do
 
 		create_persistent
 
+		echo -n "Configuring system based on cloud-config..."
 		# Use dhcp to pre-configure networking then fetch cloud configuration
 		# and kill networking
-		/sbin/udhcpc -i ${_snic} -p /var/run/udhcpc-${_snic}.pid
-		handle_cloud
-		kill $(cat /var/run/udhcpc-${_snic}.pid)
+		/sbin/udhcpc -i ${_snic} -p /var/run/udhcpc-${_snic}.pid >> ${_install_log} 2>&1
+		handle_cloud >> ${_install_log} 2>&1
+		kill $(cat /var/run/udhcpc-${_snic}.pid) >> ${_install_log} 2>&1
+		echo "done."
 
 		create_network_config
 
