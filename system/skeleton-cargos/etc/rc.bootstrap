@@ -759,7 +759,7 @@ set_timezone() {
 get_ec2()
 {
 	local _tmpf=$(mktemp 2>/dev/null)
-	/usr/pkg/bin/wget -T5 -t5 $1 -O http://169.254.169.254/${_tmpf} >> ${_install_log} 2>&1
+	/usr/pkg/bin/wget -T5 -t5 $1 -O ${_tmpf} http://169.254.169.254/$1 >> ${_install_log} 2>&1
 	local _ret=$(cat ${_tmpf})
 	echo ${_ret}
 }
