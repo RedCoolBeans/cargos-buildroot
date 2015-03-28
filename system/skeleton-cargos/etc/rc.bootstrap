@@ -966,6 +966,10 @@ while [ /usr/bin/true ]; do
 		prompt_localboot && do_localboot yes || :
 	fi
 
+    if [ -s ${runcmd_tmp} ] ; then
+        echo "executing runcmd commands" >> ${_install_log} 2>&1
+        source ${runcmd_tmp} >> ${_install_log} 2>&1
+    fi
 	/etc/rc.d/network stop >/dev/null 2>&1
 
 	is_cloud || prompt_end
@@ -973,9 +977,5 @@ while [ /usr/bin/true ]; do
 	break
 done
 
-if [ -s ${runcmd_tmp} ] ; then
-    echo "executing runcmd commands" >> ${_install_log} 2>&1
-    source ${runcmd_tmp} >> ${_install_log} 2>&1
-fi
 # On OpenStack, stuff the log to /dev/ttyS0 - can be retrieved via nova console-log
 dmesg | grep -qi openstack && cat ${_install_log} > /dev/ttyS0
