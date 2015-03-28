@@ -6,8 +6,9 @@ export PATH
 export TERM=xterm-color
 
 network_tmp=$(mktemp 2>/dev/null)
+runcmd_tmp=$(mktemp 2>/dev/null)
  
-trap "rm -f $network_tmp" 0 1 2 5 15
+trap "rm -f $network_tmp $runcmd_tmp" 0 1 2 5 15
 
 TITLE_PREFIX="CargOS Setup"
 _sdisks=""
@@ -27,8 +28,11 @@ _sec_ns="208.67.222.222"
 _install_log="/tmp/install.log"
 
 _cloud=0
-_ec2_special_url="http://169.254.169.254/"
+_ec2_special_url="http://169.254.169.254"
 _cargos_mirror="http://www.cargos.io/$(uname -m)/"
+_ci_disable_root_set=false
+_ci_disable_root=false
+_ci_any_sudo=false
 
 ci_packages() {
 	OLDIFS=$IFS
@@ -46,15 +50,25 @@ ci_packages() {
 			;;
 		esac
 	done
-	OLDIFS=$IFS
+	IFS=$OLDIFS
 }
 
 ci_disable_root() {
 	local _ret=$(awk '
-		/disable_root:/	{ print $2; }
+		$1 ~ /^#/	{ next }
+		/^disable_root:/	{ print $2; }
 		' $1 | tr '[:upper:]' '[:lower:]')
-	[ X"${_ret}" != X"false" -a X"${_ret}" != X"0" ] && return 0
-	return 1
+	if [ -n "${_ret}" ] ; then
+		_ci_disable_root_set=true
+		case "${_ret}" in
+			false|0)
+				_ci_disable_root=false
+				;;
+			true|1)
+				_ci_disable_root=true
+				;;
+		esac
+	fi
 }
 
 ci_groups() {
@@ -111,6 +125,7 @@ ci_users() {
 	' $1 | \
 		awk -v RS="- name:" '{ if ($1 == "-") { next }; print $0 > "/tmp/user." NR }'
 
+	OLDIFS=$IFS
 	_sudo_status=0
 	for _userf in $(ls -1 /tmp/user.*); do
 		_user=$(head -1 ${_userf} | tr -d '[[:space:]]')
@@ -118,7 +133,6 @@ ci_users() {
 		_ssh_authorized_keys=""
 		_cnt=0
 
-		OLDIFS=$IFS
 		IFS=$'\n'
 		for i in $(cat ${_userf}); do
 			case $i in
@@ -161,10 +175,9 @@ ci_users() {
 				source /etc/profile.d/pkg.sh
 				/usr/pkg/bin/pkgin -y in sudo
 
-				# Lock the root user if there is a regular user configured with sudo rights
-				ci_disable_root $1 && passwd -l root
 				_sudo_status=1
 			fi
+			_ci_any_sudo=true
 			if [[ $_sudo == [* ]]; then
 				IFS=',' read -a _sudo <<< "$_sudo"
 				for _sudo_entry in "${_sudo[@]}"; do
@@ -198,6 +211,7 @@ ci_users() {
 		fi
 		rm -f ${_userf}
 	done
+	IFS=$OLDIFS
 }
 
 chpasswd() {
@@ -236,7 +250,7 @@ bootcmd() {
 	awk '
 		/bootcmd:/	{ flag=1;next; }
 		/^(\w)+:/	{ flag=0; }
-		flag		{ e=$0; gsub(/ - /, "", e); gsub(/^([[:space:]])+/, "", e); print e; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
 	' $1
 }
 
@@ -244,7 +258,7 @@ runcmd() {
 	awk '
 		/runcmd:/	{ flag=1;next; }
 		/^(\w)+:/	{ flag=0; }
-		flag		{ e=$0; gsub(/ - /, "", e); gsub(/^([[:space:]])+/, "", e); print e; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
 	' $1
 }
 
@@ -782,6 +796,7 @@ get_ec2()
 	local _tmpf=$(mktemp 2>/dev/null)
 	/usr/pkg/bin/wget -T5 -t5 ${_ec2_special_url}/$1 -O ${_tmpf} >> ${_install_log} 2>&1
 	local _ret=$(cat ${_tmpf})
+	rm -f ${_tmpf}
 	echo ${_ret}
 }
 
@@ -841,12 +856,12 @@ handle_cloud()
 	# Decode user data (if not already decoded)
 	if ! [[ "`head -c 12 $CS`" == "Content-Type" || "`head -c 1 $CS`" == "#" ]]; then
 		echo "Data source seems to be encoded in base64. I will decode it."
-		base64 -d $CS > $CS.new
-		mv $CS.new $CS
+		base64 -d $CS > $CS.new && mv $CS.new $CS
+		rm -f $CS.new
 	fi
 
 	# Parse MIME encoding if present
-	BOUNDARY=`head -1 $CS | sed -n "s|^Content-Type: *multipart/mixed; *boundary *= *[\"']*\([^\"']*\)[\"']*$|\1|p"`
+	BOUNDARY=`grep '^Content-Type: *multipart/mixed; *boundary' $CS|head -1|sed -n "s|^Content-Type: *multipart/mixed; *boundary *= *[\"']*\([^\"']*\)[\"']*$|\1|p"`
 	if [ -n "$BOUNDARY" ]; then
 		echo "Data source seems to be encoded in MIME format. I will decode it."
 		awk -v B="$BOUNDARY" -v F="$CS." '{if($0=="--"B"--"){exit}if($0=="--"B){k=k+1;f=F k;getline;s=1;printf "" > f};if(s==1)print $0 >> f}' $CS
@@ -855,8 +870,9 @@ handle_cloud()
 
 	# Execute contextualization commands
 	for f in $CS*; do
-		# Skip content-type (if present)
-		if [ "`head -c 13 $f`" == "Content-Type:" ]; then
+		echo "Processing $f ..." >> ${_install_log}
+		# Skip various headers (if present)
+		if [ "`head -c 11 $f`" == "Merge-Type:" -o "`head -c 13 $f`" == "MIME-Version:" -o "`head -c 13 $f`" == "Content-Type:" -o "`head -c 20 $f`" == "Content-Disposition:" -o "`head -c 26 $f`" == "Content-Transfer-encoding:" ]; then
 			awk '{if($0==""){s=1;getline;}if(s==1)print $0}' $f > $f.new
 			mv $f.new $f
 		fi
@@ -867,10 +883,13 @@ handle_cloud()
 		# Execute contextualization command
 		FIRST_LINE="`head -1 $f`"
 		if [ "$FIRST_LINE" == "#!/bin/bash" ]; then
+			echo "Processing $f as bash script" >> ${_install_log}
 			bash $f
 		elif [ "$FIRST_LINE" == "#!/bin/sh" ]; then
+			echo "Processing $f as sh script" >> ${_install_log}
 			sh $f
 		elif [ "$FIRST_LINE" == "#cloud-config" ]; then
+			echo "Processing $f as cloud config" >> ${_install_log}
 			# Handle bootcmd
 			while read -r line; do
 				eval $line
@@ -882,10 +901,13 @@ handle_cloud()
 			[ -z ${_chpasswd} ] || /usr/sbin/chpasswd < ${_chpasswd}
 			rm -f ${_chpasswd}
 
-			# Handle runcmd, append to /etc/rc.local
+			# Handle runcmd, append to $runcmd_tmp
 			while read -r line; do
-				echo $line >> /etc/rc.local
+				echo $line >> ${runcmd_tmp}
 			done < <(runcmd $f)
+
+			# Handle disable_root
+			ci_disable_root $f
 
 			# Handle groups
 			ci_groups $f
@@ -896,8 +918,18 @@ handle_cloud()
 			# Handle packages
 			ci_packages $f
 		fi
-		rm ${CS}
 	done
+
+	echo "_ci_disable_root_set=${_ci_disable_root_set}" >> ${_install_log}
+	echo "_ci_disable_root=${_ci_disable_root}" >> ${_install_log}
+	echo "_ci_any_sudo=${_ci_any_sudo}" >> ${_install_log}
+	if ${_ci_disable_root_set} ; then
+		# Explicitely specifying disable_root has precedence
+		${_ci_disable_root} && passwd -l root
+	else
+		${_ci_any_sudo} && passwd -l root
+	fi
+	rm -f $CS*
 }
 
 while [ /usr/bin/true ]; do
@@ -919,8 +951,7 @@ while [ /usr/bin/true ]; do
 		create_network_config
 
 		# XXX Enforce local boot on OpenStack for the time being
-		dmesg | grep -qi openstack
-		[ $? -eq 0 ] && do_localboot no
+		dmesg | grep -qi openstack && do_localboot no
 	else
 		prompt_welcome
 		[ $? -ne 0 ] && exit 1
@@ -935,9 +966,17 @@ while [ /usr/bin/true ]; do
 		prompt_localboot && do_localboot yes || :
 	fi
 
+	if [ -s ${runcmd_tmp} ] ; then
+		echo "executing the following runcmd commands:" >> ${_install_log}
+		cat ${runcmd_tmp} >> ${_install_log}
+		source ${runcmd_tmp} >> ${_install_log} 2>&1
+	fi
 	/etc/rc.d/network stop >/dev/null 2>&1
 
 	is_cloud || prompt_end
 
 	break
 done
+
+# On OpenStack, stuff the log to /dev/ttyS0 - can be retrieved via nova console-log
+dmesg | grep -qi openstack && cat ${_install_log} > /dev/ttyS0
