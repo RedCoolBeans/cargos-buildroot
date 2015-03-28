@@ -250,7 +250,7 @@ bootcmd() {
 	awk '
 		/bootcmd:/	{ flag=1;next; }
 		/^(\w)+:/	{ flag=0; }
-		flag		{ e=$0; gsub(/ - /, "", e); gsub(/^([[:space:]])+/, "", e); print e; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
 	' $1
 }
 
@@ -258,7 +258,7 @@ runcmd() {
 	awk '
 		/runcmd:/	{ flag=1;next; }
 		/^(\w)+:/	{ flag=0; }
-		flag		{ e=$0; gsub(/ - /, "", e); gsub(/^([[:space:]])+/, "", e); print e; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
 	' $1
 }
 
@@ -966,10 +966,11 @@ while [ /usr/bin/true ]; do
 		prompt_localboot && do_localboot yes || :
 	fi
 
-    if [ -s ${runcmd_tmp} ] ; then
-        echo "executing runcmd commands" >> ${_install_log} 2>&1
-        source ${runcmd_tmp} >> ${_install_log} 2>&1
-    fi
+	if [ -s ${runcmd_tmp} ] ; then
+		echo "executing the following runcmd commands:" >> ${_install_log}
+		cat ${runcmd_tmp} >> ${_install_log}
+		source ${runcmd_tmp} >> ${_install_log} 2>&1
+	fi
 	/etc/rc.d/network stop >/dev/null 2>&1
 
 	is_cloud || prompt_end
