@@ -6,9 +6,9 @@ export PATH
 export TERM=xterm-color
 
 network_tmp=$(mktemp 2>/dev/null)
-runcmd_tmp=$(mktemp 2>/dev/null)
+runcmd_tmp=/tmp/cloud-init-runcmd.sh
  
-trap "rm -f $network_tmp $runcmd_tmp" 0 1 2 5 15
+trap "rm -f $network_tmp" 0 1 2 5 15
 
 TITLE_PREFIX="CargOS Setup"
 _sdisks=""
@@ -966,11 +966,6 @@ while [ /usr/bin/true ]; do
 		prompt_localboot && do_localboot yes || :
 	fi
 
-	if [ -s ${runcmd_tmp} ] ; then
-		echo "executing the following runcmd commands:" >> ${_install_log}
-		cat ${runcmd_tmp} >> ${_install_log}
-		source ${runcmd_tmp} >> ${_install_log} 2>&1
-	fi
 	/etc/rc.d/network stop >/dev/null 2>&1
 
 	is_cloud || prompt_end
