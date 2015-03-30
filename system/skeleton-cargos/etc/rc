@@ -236,6 +236,15 @@ rc_real_work()
 		print_rc_metadata "cmd-status:$_rc_elem:$?"
 	done
 
+    # If cloud-init has created a runcmd script, run it
+    if [ -s /tmp/cloud-init-runcmd.sh ]; then
+	    print_rc_metadata "cmd-name:cloud-init-runcmd"
+        bash /tmp/cloud-init-runcmd.sh > /var/log/cloud-init-runcmd.log 2>&1
+        print_rc_metadata "cmd-status:cloud-init-runcmd:$?"
+        # This should only run on first boot, so delete it
+        rm -f /tmp/cloud-init-runcmd.sh
+    fi
+
 	print_rc_metadata "end:$(date)"
 	exit 0
 )
