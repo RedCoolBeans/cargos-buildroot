@@ -11,6 +11,14 @@ CMAKE_LICENSE = BSD-3c
 CMAKE_LICENSE_FILES = Copyright.txt
 
 HOST_CMAKE_DEPENDENCIES = host-pkgconf
+CMAKE_DEPENDENCIES = zlib libcurl libarchive expat bzip2 xz
+
+CMAKE_CONF_OPTS = \
+	-DKWSYS_LFS_WORKS=TRUE \
+	-DKWSYS_CHAR_IS_SIGNED=TRUE \
+	-DCMAKE_USE_SYSTEM_LIBRARIES=1 \
+	-DCTEST_USE_XMLRPC=OFF \
+	-DBUILD_CursesDialog=OFF
 
 # Get rid of -I* options from $(HOST_CPPFLAGS) to prevent that a
 # header available in $(HOST_DIR)/usr/include is used instead of a
