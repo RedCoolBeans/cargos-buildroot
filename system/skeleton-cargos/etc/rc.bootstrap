@@ -387,12 +387,12 @@ prompt_nic() {
 		--ok-label "Save" \
 		--form "Please enter your desired configuration" \
 		15 50 0 \
-		"Hostname" 1 1 "$_hostname"		1 25 20 0 \
-		"IP Address or 'dhcp'" 2 1 "$_ipaddr"	2 25 20 0 \
-		"Network mask" 3 1 "$_mask"		3 25 20 0 \
-		"Default gateway" 4 1 "$_gw"		4 25 20 0 \
-		"Primary DNS server" 5 1 "$_pri_ns"	5 25 20 0 \
-		"Secondary DNS server" 6 1 "$_sec_ns"	6 25 20 0 \
+		"Hostname" 1 1 "$_hostname"			1 25 20 0 \
+		"IPv(4|6) Address or 'dhcp(6)'" 2 1 "$_ipaddr"	2 25 20 0 \
+		"Network mask" 3 1 "$_mask"			3 25 20 0 \
+		"Default gateway" 4 1 "$_gw"			4 25 20 0 \
+		"Primary DNS server" 5 1 "$_pri_ns"		5 25 20 0 \
+		"Secondary DNS server" 6 1 "$_sec_ns"		6 25 20 0 \
 		2> ${network_tmp}
 
 	_hostname=$(sed -n "1p" ${network_tmp})
