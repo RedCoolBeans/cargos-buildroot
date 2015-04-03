@@ -220,6 +220,13 @@ network_start_interfaces()
 						-p /var/run/udhcpc-${int}.pid >/dev/null
 				fi
 				;;
+			dhcp6)
+				if ! checkyesno udhcpc6; then
+					/usr/bin/udhcpc6 \
+						${udhcpc6_flags} -i $int \
+						-p /var/run/udhcpc6-${int}.pid >/dev/null
+				fi
+				;;
 			*)
 				# Pass args to ifconfig.  Note
 				# that args may contain embedded
@@ -403,6 +410,9 @@ network_stop_interfaces()
 			if [ -f /var/run/udhcpc-${int}.pid ]; then
 				kill $(cat /var/run/udhcpc-${int}.pid) 2> /dev/null
 			fi
+			if [ -f /var/run/udhcpc6-${int}.pid ]; then
+				kill $(cat /var/run/udhcpc6-${int}.pid) 2> /dev/null
+			fi
 			ip link set dev $int down
 		fi
 	done
@@ -418,5 +428,6 @@ network_stop_route()
 
 load_rc_config $name
 load_rc_config_var udhcpc udhcpc
+load_rc_config_var udhcpc6 udhcpc6
 load_rc_config_var ipfilter ipfilter
 run_rc_command "$1"
