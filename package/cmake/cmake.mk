@@ -47,4 +47,26 @@ define HOST_CMAKE_INSTALL_CMDS
 	$(HOST_MAKE_ENV) $(MAKE) -C $(@D) install
 endef
 
+define CMAKE_REMOVE_EXTRA_DATA
+	rm $(TARGET_DIR)/usr/bin/{cmake,cpack}
+	rm -fr $(TARGET_DIR)/usr/share/cmake-$(CMAKE_VERSION_MAJOR)/{completions,editors}
+	rm -fr $(TARGET_DIR)/usr/share/cmake-$(CMAKE_VERSION_MAJOR)/{Help,include}
+endef
+
+define CMAKE_INSTALL_CTEST_CFG_FILE
+	$(INSTALL) -m 0644 -D $(@D)/Modules/CMake.cmake \
+		$(TARGET_DIR)/usr/share/cmake-$(CMAKE_VERSION_MAJOR)/Modules/CMake.cmake.ctest
+endef
+
+CMAKE_POST_INSTALL_TARGET_HOOKS += CMAKE_REMOVE_EXTRA_DATA
+CMAKE_POST_INSTALL_TARGET_HOOKS += CMAKE_INSTALL_CTEST_CFG_FILE
+
+define CMAKE_INSTALL_TARGET_CMDS
+	(cd $(@D); \
+		$(HOST_MAKE_ENV) DESTDIR=$(TARGET_DIR) \
+		cmake -P cmake_install.cmake \
+	)
+endef
+
+$(eval $(cmake-package))
 $(eval $(host-generic-package))
