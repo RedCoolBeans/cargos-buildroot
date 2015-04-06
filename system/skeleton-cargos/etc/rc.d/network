@@ -332,7 +332,7 @@ network_start_defaultroute6()
 			warn \
 	    "ip6mode is set to 'autohost' and a v6 default route is also set."
 		fi
-		/sbin/route add -inet6 default $defaultroute6
+		ip -6 route add default via $defaultroute6
 	fi
 }
 
