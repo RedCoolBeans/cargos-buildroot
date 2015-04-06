@@ -357,8 +357,7 @@ create_network_config() {
 		[ -z $_gw ] || echo "defaultroute=\"$_gw\"" >> /etc/rc.conf
 		[ -z $_pri_ns ] || echo "nameserver $_pri_ns" > /etc/resolv.conf
 		[ -z $_sec_ns ] || echo "nameserver $_sec_ns" >> /etc/resolv.conf
-		_ripaddr=$(echo "$_ipaddr" | sed 's/inet //g')
-		echo "${_ripaddr}	${_hostname}" >> /etc/hosts
+		echo "${_paddr}	${_hostname}" >> /etc/hosts
 	else
 		echo "ifconfig_${_snic}=\"$_ipaddr\"" >> /etc/rc.conf
 	fi
@@ -386,13 +385,13 @@ prompt_nic() {
 		--title "Configuration for ${_snic}" \
 		--ok-label "Save" \
 		--form "Please enter your desired configuration" \
-		15 50 0 \
-		"Hostname" 1 1 "$_hostname"			1 25 20 0 \
-		"IPv(4|6) Address or 'dhcp(6)'" 2 1 "$_ipaddr"	2 25 20 0 \
-		"Network mask" 3 1 "$_mask"			3 25 20 0 \
-		"Default gateway" 4 1 "$_gw"			4 25 20 0 \
-		"Primary DNS server" 5 1 "$_pri_ns"		5 25 20 0 \
-		"Secondary DNS server" 6 1 "$_sec_ns"		6 25 20 0 \
+		15 70 0 \
+		"Hostname" 1 1 "$_hostname"			1 32 20 0 \
+		"IPv(4|6) Address or 'dhcp(6)'" 2 1 "$_ipaddr"	2 32 20 0 \
+		"Network mask" 3 1 "$_mask"			3 32 20 0 \
+		"Default gateway" 4 1 "$_gw"			4 32 20 0 \
+		"Primary DNS server" 5 1 "$_pri_ns"		5 32 20 0 \
+		"Secondary DNS server" 6 1 "$_sec_ns"		6 32 20 0 \
 		2> ${network_tmp}
 
 	_hostname=$(sed -n "1p" ${network_tmp})
@@ -403,7 +402,7 @@ prompt_nic() {
 	_sec_ns=$(sed -n "6p" ${network_tmp})
 
 	if [ ${_ipaddr} != "dhcp" ]; then
-		is_net ${_ipaddr} || return 1 && _ipaddr="inet ${_ipaddr}"
+		is_net ${_ipaddr} || return 1
 		is_net ${_mask} || return 1 && _mask="netmask ${_mask}"
 		is_net ${_gw} || return 1
 	else

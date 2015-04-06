@@ -239,6 +239,7 @@ network_start_interfaces()
 					eval set -- $args
 					#echo >&2 "[$#] [$1] [$2] [$3]"
 					/sbin/ifconfig $int "$@"
+					/sbin/ifconfig $int up
 				)
 				;;
 			esac
