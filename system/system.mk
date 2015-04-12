@@ -36,7 +36,7 @@ TARGET_FINALIZE_HOOKS += SYSTEM_ISSUE
 endif
 
 ifneq ($(TARGET_GENERIC_ROOT_PASSWD),)
-TARGETS += host-mkpasswd
+PACKAGES += host-mkpasswd
 endif
 
 NETWORK_DHCP_IFACE = $(call qstrip,$(BR2_SYSTEM_DHCP))
