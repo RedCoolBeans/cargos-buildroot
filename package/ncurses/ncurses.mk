@@ -96,10 +96,6 @@ NCURSES_LINK_STAGING_PC = $(call NCURSES_LINK_PC,$(STAGING_DIR))
 
 NCURSES_CONF_OPTS += --enable-ext-colors
 NCURSES_ABI_VERSION = 6
-define NCURSES_INSTALL_TARGET_256_COLORS_TERMINFO
-	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm+256color $(TARGET_DIR)/usr/share/terminfo/x
-	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm-256color $(TARGET_DIR)/usr/share/terminfo/x
-endef
 
 NCURSES_POST_INSTALL_STAGING_HOOKS += NCURSES_LINK_STAGING_LIBS
 NCURSES_POST_INSTALL_STAGING_HOOKS += NCURSES_LINK_STAGING_PC
@@ -145,11 +141,16 @@ define NCURSES_INSTALL_TARGET_CMDS
 	$(NCURSES_LINK_TARGET_LIBS)
 	$(NCURSES_INSTALL_TARGET_PROGS)
 	ln -snf /usr/share/terminfo $(TARGET_DIR)/usr/lib/terminfo
+	mkdir -p $(TARGET_DIR)/usr/share/terminfo/r
+	cp -dpf $(STAGING_DIR)/usr/share/terminfo/r/rxvt $(TARGET_DIR)/usr/share/terminfo/r
+	cp -dpf $(STAGING_DIR)/usr/share/terminfo/r/rxvt-color $(TARGET_DIR)/usr/share/terminfo/r
+	cp -dpf $(STAGING_DIR)/usr/share/terminfo/r/rxvt-256color $(TARGET_DIR)/usr/share/terminfo/r
 	mkdir -p $(TARGET_DIR)/usr/share/terminfo/x
 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm $(TARGET_DIR)/usr/share/terminfo/x
 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm-color $(TARGET_DIR)/usr/share/terminfo/x
 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm-xfree86 $(TARGET_DIR)/usr/share/terminfo/x
-	$(NCURSES_INSTALL_TARGET_256_COLORS_TERMINFO)
+	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm+256color $(TARGET_DIR)/usr/share/terminfo/x
+	cp -dpf $(STAGING_DIR)/usr/share/terminfo/x/xterm-256color $(TARGET_DIR)/usr/share/terminfo/x
 	mkdir -p $(TARGET_DIR)/usr/share/terminfo/v
 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/v/vt100 $(TARGET_DIR)/usr/share/terminfo/v
 	cp -dpf $(STAGING_DIR)/usr/share/terminfo/v/vt102 $(TARGET_DIR)/usr/share/terminfo/v
