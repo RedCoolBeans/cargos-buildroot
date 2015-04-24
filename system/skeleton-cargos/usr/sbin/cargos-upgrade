@@ -86,7 +86,7 @@ if [ ! -e ${_grub_install} ]; then
 	pr_error "${0##*/} needs grub2 to be installed: please issue 'pkgin in grub2' to install."
 fi
 
-_rver=$(${_wget} -qO - http://cargos.io/x86_64/current)
+_rver=$(${_wget} -qO - http://download.cargos.io/current)
 _cver=$(cat /etc/cargos-release)
 
 if [ X"${_rver}" == X"${_cver}" ]; then
@@ -140,12 +140,12 @@ for _version in ${_rver} ${_cver}; do
 	echo
 	echo -n "* Downloading root filesystem for ${_version} ... "
 	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/rootfs.squashfs-noinst-${_version} \
-		http://cargos.io/x86_64/${_version}/rootfs.squashfs-noinst-${_version}
+		http://download.cargos.io/${_version}/x86_64/rootfs.squashfs-noinst-${_version}
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 	echo
 	echo -n "* Downloading kernel image for ${_version} ... "
 	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/bzImage-${_version} \
-		http://cargos.io/x86_64/${_version}/bzImage-${_version}
+		http://download.cargos.io/${_version}/x86_64/bzImage-${_version}
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 done
 
