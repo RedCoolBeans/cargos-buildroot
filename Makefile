@@ -75,7 +75,7 @@ export BR2_VERSION_FULL := $(BR2_VERSION)$(shell $(TOPDIR)/support/scripts/setlo
 noconfig_targets := menuconfig nconfig gconfig xconfig config oldconfig randconfig \
 	defconfig %_defconfig allyesconfig allnoconfig silentoldconfig release \
 	randpackageconfig allyespackageconfig allnopackageconfig \
-	source-check print-version olddefconfig
+	print-version olddefconfig
 
 # Strip quotes and then whitespaces
 qstrip = $(strip $(subst ",,$(1)))
@@ -426,10 +426,8 @@ prepare: $(BUILD_DIR)/buildroot-config/auto.conf
 world: target-post-image
 
 .PHONY: all world toolchain dirs clean distclean source outputmakefile \
-	legal-info legal-info-prepare legal-info-clean printvars \
-	target-finalize target-post-image check-skeleton \
-	$(TARGETS) $(TARGETS_ROOTFS) \
-	$(TARGETS_DIRCLEAN) $(TARGETS_SOURCE) $(TARGETS_LEGAL_INFO)
+	legal-info legal-info-prepare legal-info-clean printvars help \
+	list-defconfigs target-finalize target-post-image source-check
 
 ################################################################################
 #
@@ -630,6 +628,10 @@ _external-deps: $(foreach p,$(PACKAGES),$(p)-all-external-deps)
 external-deps:
 	@$(MAKE1) -Bs $(EXTRAMAKEARGS) _external-deps | sort -u
 
+# check if download URLs are outdated
+source-check:
+	$(MAKE1) DL_MODE=SOURCE_CHECK $(EXTRAMAKEARGS) source
+
 legal-info-clean:
 	@rm -fr $(LEGAL_INFO_DIR)
 
@@ -783,10 +785,6 @@ savedefconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
-
-# check if download URLs are outdated
-source-check:
-	$(MAKE1) DL_MODE=SOURCE_CHECK $(EXTRAMAKEARGS) source
 
 .PHONY: defconfig savedefconfig
 
