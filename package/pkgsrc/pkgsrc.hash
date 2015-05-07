@@ -1,3 +1,2 @@
 # Locally calculated after checking pgp signature
-sha256	628398bf130c1ed3ae0cf364db1b113a059c5a571b01eb55cbe4d3b863ca98b5	bootstrap-cargos-2015.7-x86_64.tar.gz
-sha256	628398bf130c1ed3ae0cf364db1b113a059c5a571b01eb55cbe4d3b863ca98b5	bootstrap-cargos-2015.8-x86_64.tar.gz
+sha256	16351d83b127bc3844536ed83a795515d6add6a73ce458c40a697e46f9a442c8	bootstrap-cargos-2015.8-x86_64.tar.gz
