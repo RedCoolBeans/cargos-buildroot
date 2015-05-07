@@ -24,11 +24,12 @@ export TERM=xterm-color
 
 usage() {
 	echo
-	echo "Usage: ${0##*/} [-nf]" >&2
+	echo "Usage: ${0##*/} [-fnu]" >&2
 	echo
 	echo "Options:"
 	echo "  -f    force installation to the disk(s)"
 	echo "  -n    dry-run mode, only report what would be done"
+	echo "  -u    upgrade release"
 	echo
 	exit 1
 }
@@ -60,10 +61,58 @@ cmd_exe() {
 	fi
 }
 
-while getopts 'fn' arg; do
+# CargOS upgrade 2015.7 -> 2015.8
+upgrade_20157_to_20158() {
+	clear
+	PKG_PATH=http://download.cargos.io/$(cat /etc/cargos-release)/$(uname -m)/packages/All
+	/usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug
+	rm -rf /usr/pkg/var/chroot/sshd && mkdir -p /usr/pkg/var/chroot/sshd
+	/usr/pkg/sbin/pkg_delete -f openssl	
+	for p in $(/usr/pkg/sbin/pkg_info | cut -d ' ' -f1 | sed 's/.[^-]*$//')
+	do
+		PKG_PATH=${PKG_PATH} /usr/pkg/sbin/pkg_add -U $p
+	done
+	source /etc/profile && /usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug
+	/bin/sync
+	_message="
+	The upgrade requires a reboot. Do you want to reboot now?!
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Upgrade Utility" \
+		--yesno "${_message}" 7 80
+	[ $? -gt 0 ] && exit 0
+	/sbin/reboot
+fi
+}
+
+cargos_upgrade() {
+	. /etc/os-release
+	_cver=$(cat /etc/cargos-release)
+	if [ X"${VERSION}" == X"${_cver}" ]; then
+		_message="
+		Your CargOS installation on the disk(s) is up-to-date!
+		"
+		dialog --backtitle "${TITLE_PREFIX}" \
+			--title "CargOS Upgrade Utility" \
+			--msgbox "${_message}" 7 60
+		clear && exit 0
+	fi
+	_message="
+	Do you want to proceed with the upgrade from ${VERSION} to ${_cver} ?!
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Upgrade Utility" \
+		--yesno "${_message}" 7 70
+	[ $? -gt 0 ] && exit 0
+	upgrade_${VERSION//./}_to_${_cver//./}
+	exit 0
+}
+
+while getopts 'fnu' arg; do
 	case ${arg} in
 	n)	dryrun=" (dry run)" ;;
 	f)	force=1 ;;
+	u)	upgrade=1 ;;
 	*)	usage ;;
 	esac
 done
@@ -74,6 +123,8 @@ if [ -f ${_PID} ]; then
 fi
 
 echo $$ >${_PID}
+
+[ -z ${upgrade} ] || cargos_upgrade
 
 _wget=$(which wget) || _wget="/usr/pkg/bin/wget"
 _grub_install=$(which grub-install) || _grub_install="/usr/pkg/sbin/grub-install"
