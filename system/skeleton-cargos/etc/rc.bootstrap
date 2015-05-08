@@ -583,7 +583,7 @@ create_persistent() {
 	done | \
 	dialog --backtitle "${TITLE_PREFIX} - Storage" \
 		--title "Creating persistent storage" \
-		--gauge "Executing BTRFS filesystem creation and bootstrapping the system..." 10 70
+		--gauge "Creating BTRFS filesystem and bootstrapping the system..." 10 70
 }
 
 change_root_password() {
