@@ -24,9 +24,10 @@ export TERM=xterm-color
 
 usage() {
 	echo
-	echo "Usage: ${0##*/} [-fnu]" >&2
+	echo "Usage: ${0##*/} [-cfnu]" >&2
 	echo
 	echo "Options:"
+	echo "  -c    check if the base system needs upgrading with -u"
 	echo "  -f    force installation to the disk(s)"
 	echo "  -n    dry-run mode, only report what would be done"
 	echo "  -u    run upgrade steps required for the current release"
@@ -85,6 +86,15 @@ upgrade_20157_to_20158() {
 	/sbin/reboot
 }
 
+cargos_check_upgrade() {
+	. /etc/os-release
+	_cver=$(cat /etc/cargos-release)
+	[ X"${VERSION}" != X"${_cver}" ] && \
+		[ X"$(type -t upgrade_${VERSION//./}_to_${_cver//./})" == X"function" ] && \
+			echo "Your CargOS installation needs to be updated with 'cargos-upgrade -u' !"
+	exit 0
+}
+
 cargos_upgrade() {
 	. /etc/os-release
 	_cver=$(cat /etc/cargos-release)
@@ -104,12 +114,15 @@ cargos_upgrade() {
 		--title "CargOS Upgrade Utility" \
 		--yesno "${_message}" 7 70
 	[ $? -gt 0 ] && exit 0
-	upgrade_${VERSION//./}_to_${_cver//./}
+	echo -n "* Executing upgrade_${VERSION//./}_to_${_cver//./} ... "
+	cmd_exe upgrade_${VERSION//./}_to_${_cver//./}
+	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 	exit 0
 }
 
-while getopts 'fnu' arg; do
+while getopts 'cfnu' arg; do
 	case ${arg} in
+	c)	check=1 ;;
 	n)	dryrun=" (dry run)" ;;
 	f)	force=1 ;;
 	u)	upgrade=1 ;;
@@ -124,6 +137,7 @@ fi
 
 echo $$ >${_PID}
 
+[ -z ${check} ] || cargos_check_upgrade
 [ -z ${upgrade} ] || cargos_upgrade
 
 _wget=$(which wget) || _wget="/usr/pkg/bin/wget"
