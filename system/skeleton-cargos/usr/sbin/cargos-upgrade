@@ -82,7 +82,6 @@ upgrade_20157_to_20158() {
 		--yesno "${_message}" 7 80
 	[ $? -gt 0 ] && exit 0
 	/sbin/reboot
-fi
 }
 
 cargos_upgrade() {
