@@ -72,7 +72,8 @@ upgrade_20157_to_20158() {
 	do
 		PKG_PATH=${PKG_PATH} /usr/pkg/sbin/pkg_add -U $p
 	done
-	source /etc/profile && /usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug
+	source /etc/profile && /usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug && \
+		/usr/pkg/bin/pkgin -f up
 	/bin/sync
 	_message="
 	The upgrade requires a reboot. Do you want to reboot now?!
