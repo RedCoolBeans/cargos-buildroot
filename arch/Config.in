@@ -15,6 +15,14 @@ choice
 	help
 	  Select the target architecture family to build for.
 
+config BR2_arm
+	bool "ARM (little endian)"
+	help
+	  ARM is a 32-bit reduced instruction set computer (RISC) instruction
+	  set architecture (ISA) developed by ARM Holdings. Little endian.
+	  http://www.arm.com/
+	  http://en.wikipedia.org/wiki/ARM
+
 config BR2_i386
 	bool "i386"
 	help
@@ -92,6 +100,10 @@ config BR2_BINFMT_ELF
 	  systems.
 
 endchoice
+
+if BR2_arm
+source "arch/Config.in.arm"
+endif
 
 if BR2_i386 || BR2_x86_64
 source "arch/Config.in.x86"
