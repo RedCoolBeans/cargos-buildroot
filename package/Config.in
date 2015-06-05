@@ -34,6 +34,7 @@ endmenu
 menu "Hardware handling"
 menu "Firmware"
 	source "package/linux-firmware/Config.in"
+	source "package/rpi-firmware/Config.in"
 endmenu
 	source "package/acpid/Config.in"
 	source "package/cryptsetup/Config.in"
