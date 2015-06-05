@@ -47,6 +47,10 @@ fi
 
 _TMPDIR=$(mktemp -d) || exit 1
 _PID="/var/run/${0##*/}.pid"
+# Based on the machine type, lookup the associated CargOS platform name.
+# XXX: This currently assumes all ARMv7s are rpi2 which is easier for
+# the time being, but will not hold true when other boards are added.
+_arch=$(uname -m | sed -e 's/armv7/rpi2/')
 
 trap "bye_bye" 0 1 2 5 15
 
@@ -205,12 +209,12 @@ for _version in ${_rver} ${_cver}; do
 	echo
 	echo -n "* Downloading root filesystem for ${_version} ... "
 	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/rootfs.squashfs-noinst-${_version} \
-		http://download.cargos.io/${_version}/x86_64/rootfs.squashfs-noinst-${_version}
+		http://download.cargos.io/${_version}/${_arch}/rootfs.squashfs-noinst-${_version}
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 	echo
 	echo -n "* Downloading kernel image for ${_version} ... "
 	cmd_exe /usr/pkg/bin/wget -T5 -t5 -qO /tmp/bzImage-${_version} \
-		http://download.cargos.io/${_version}/x86_64/bzImage-${_version}
+		http://download.cargos.io/${_version}/${_arch}/bzImage-${_version}
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 done
 

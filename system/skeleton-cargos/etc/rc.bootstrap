@@ -29,11 +29,14 @@ _install_log="/tmp/install.log"
 
 _cloud=0
 _ec2_special_url="http://169.254.169.254"
-_arch=$(uname -m)
 _cargos_mirror="http://download.cargos.io/"
 _ci_disable_root_set=false
 _ci_disable_root=false
 _ci_any_sudo=false
+# Based on the machine type, lookup the associated CargOS platform name.
+# XXX: This currently assumes all ARMv7s are rpi2 which is easier for
+# the time being, but will not hold true when other boards are added.
+_arch=$(uname -m | sed -e 's/armv7/rpi2/')
 
 ci_packages() {
 	OLDIFS=$IFS
@@ -567,7 +570,7 @@ create_persistent() {
 		bootstrap)
 			{
 			local _version=$(cat /etc/cargos-release)
-			/bin/gzip -d < /var/db/bootstrap-cargos-${_version}-x86_64.tar.gz | /bin/tar xhf - -C /
+			/bin/gzip -d < /var/db/bootstrap-cargos-${_version}-${_arch}.tar.gz | /bin/tar xhf - -C /
 			/bin/bash /usr/pkg/.install/bootstrap.sh
 			rm -rf /usr/pkg/.install
 			} >> ${_install_log} 2>&1
