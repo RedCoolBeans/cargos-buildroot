@@ -1,4 +1,4 @@
-##### To build CargOS from scratch, do the following:
+### To build CargOS from scratch, do the following:
 
 Ensure the build dependencies are satisfied, this includes the following,
 most of which are normally already installed:
@@ -15,15 +15,32 @@ most of which are normally already installed:
 - perl-Data-Dumper
 - perl-Thread-Queue
 - qemu-img
-- squashfs-tools
 - unzip
-- xorriso
 - wget
 
-Then proceed to build CargOS:
+Depending on the platform you're building for you'll need these additional
+dependencies:
 
-1. run 'make cargos_x86_defconfig'
-2. run 'make'
+`x86` (64-bit capable x86 only)
+
+- squashfs-tools
+- xorriso
+
+`rpi2` (Raspberry Pi 2)
+
+- dosfstools
+- kpartx
+
+Then proceed to build CargOS, replace ${platform} with the platform you're
+building for (`x86` or `rpi2`)
+
+1. run `make cargos_${platform}_defconfig`
+2. run `make`
 3. wait while it compiles
 
-##### You do not need to be root to build or run buildroot.  Have fun!
+**You do not need to be root to build or run buildroot.  Have fun!**
+
+### Caveats
+
+- Support for Raspberry Pi 2 is currently under development and therefore not
+  officially supported (yet).
