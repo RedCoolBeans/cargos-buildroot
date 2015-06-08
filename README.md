@@ -21,7 +21,7 @@ most of which are normally already installed:
 Depending on the platform you're building for you'll need these additional
 dependencies:
 
-`x86` (64-bit capable x86 only)
+`x86_64` (64-bit capable x86 only)
 
 - squashfs-tools
 - xorriso
@@ -32,7 +32,7 @@ dependencies:
 - kpartx
 
 Then proceed to build CargOS, replace ${platform} with the platform you're
-building for (`x86` or `rpi2`)
+building for (`x86_64` or `rpi2`)
 
 1. run `make cargos_${platform}_defconfig`
 2. run `make`
