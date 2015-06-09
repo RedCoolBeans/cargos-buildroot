@@ -18,6 +18,7 @@ menu "Development tools"
 if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
 	source "package/gawk/Config.in"
 endif
+	source "package/gperf/Config.in"
 	source "package/gettext/Config.in"
 	source "package/libtool/Config.in"
 	source "package/pkgconf/Config.in"
