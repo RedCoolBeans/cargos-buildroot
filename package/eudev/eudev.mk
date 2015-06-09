@@ -24,7 +24,7 @@ EUDEV_CONF_OPTS =		\
 	--enable-split-usr			\
 	--enable-libkmod
 
-EUDEV_DEPENDENCIES = host-gperf host-pkgconf util-linux kmod
+EUDEV_DEPENDENCIES = host-pkgconf util-linux kmod
 EUDEV_PROVIDES = udev
 
 ifeq ($(BR2_PACKAGE_EUDEV_RULES_GEN),y)
