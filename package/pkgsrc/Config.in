@@ -4,3 +4,10 @@ config BR2_PACKAGE_PKGSRC
 	  pkgsrc bootstrap tarball
 
 	  http://www.pkgsrc.org/
+
+config BR2_PKGSRC_ARCH
+	string "pkgsrch architecture"
+	default BR2_ARCH
+	depends on BR2_PACKAGE_PKGSRC
+	help
+	  Package architecture, in case it differs from the platform name.
