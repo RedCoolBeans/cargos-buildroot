@@ -36,7 +36,7 @@ _ci_any_sudo=false
 # Based on the machine type, lookup the associated CargOS platform name.
 # XXX: This currently assumes all ARMv7s are rpi2 which is easier for
 # the time being, but will not hold true when other boards are added.
-_arch=$(uname -m | sed -e 's/armv7/rpi2/')
+_arch=$(uname -m | sed -e 's/armv7l/rpi2/')
 
 ci_packages() {
 	OLDIFS=$IFS
