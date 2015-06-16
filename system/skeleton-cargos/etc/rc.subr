@@ -328,7 +328,7 @@ wait_for_pids()
 			_prefix=", "
 		fi
 		# We want this to be a tight loop for a fast exit
-		sleep 0.05
+		usleep 50000
 	done
 	if [ -n "$_prefix" ]; then
 		echo "."
