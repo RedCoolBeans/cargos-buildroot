@@ -537,7 +537,7 @@ create_persistent() {
 		mkfs_btrfs)
 			{
 			mkfs.btrfs -L cargos ${_parts}
-			local _uuid=$(btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
+			local _uuid=$(MALLOC_CHECK_=0 btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
 			mount /dev/disk/by-uuid/$_uuid /mnt
 			(cd /mnt; btrfs subvolume create root)
 			(cd /mnt; btrfs subvolume create pkg)
@@ -557,7 +557,7 @@ create_persistent() {
 			;;
 		mount)
 			{
-			local _uuid=$(btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
+			local _uuid=$(MALLOC_CHECK_=0 btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
 			mount /dev/disk/by-uuid/$_uuid /cargos
 			mount -o subvol=pkg /dev/disk/by-uuid/$_uuid /usr/pkg
 			mount -o subvol=root /dev/disk/by-uuid/$_uuid /root
@@ -1008,6 +1008,8 @@ while [ /usr/bin/true ]; do
 		while true; do prompt_disk && break ; done
 		create_persistent
 		create_network_config
+		cat ${_install_log}
+		sleep 60
 		while true ; do change_root_password && break ; done
 		set_timezone
 		save_kmap
