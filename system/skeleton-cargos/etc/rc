@@ -38,7 +38,7 @@ rc_preprocess()
 	modprobe fuse
 	modprobe ext4
 	modprobe btrfs
-	btrfs fi show | grep -q cargos
+	MALLOC_CHECK_=0 btrfs fi show | grep -q cargos
 	if [ $? -gt 0 ]; then
 		/etc/rc.bootstrap
 	else

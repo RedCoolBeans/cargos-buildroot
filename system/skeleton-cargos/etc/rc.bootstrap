@@ -372,6 +372,11 @@ is_inet6() {
 	return 0
 }
 
+udev_trigger() {
+	udevadm trigger --action=add
+	udevadm settle || true
+}
+
 prompt_welcome() {
 	local _message="
 	You must answer the following questions to configure the system.
@@ -537,6 +542,7 @@ create_persistent() {
 		mkfs_btrfs)
 			{
 			mkfs.btrfs -L cargos ${_parts}
+			udev_trigger
 			local _uuid=$(MALLOC_CHECK_=0 btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
 			mount /dev/disk/by-uuid/$_uuid /mnt
 			(cd /mnt; btrfs subvolume create root)
