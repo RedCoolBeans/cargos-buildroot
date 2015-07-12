@@ -570,6 +570,12 @@ target-finalize: $(PACKAGES)
 ifneq ($(BR2_PACKAGE_GDB),y)
 	rm -rf $(TARGET_DIR)/usr/share/gdb
 endif
+ifneq ($(BR2_PACKAGE_BASH),y)
+	rm -rf $(TARGET_DIR)/usr/share/bash-completion
+endif
+ifneq ($(BR2_PACKAGE_ZSH),y)
+	rm -rf $(TARGET_DIR)/usr/share/zsh
+endif
 	rm -rf $(TARGET_DIR)/usr/share/gtk-doc
 	$(STRIP_FIND_CMD) | xargs $(STRIPCMD) 2>/dev/null || true
 	if test -d $(TARGET_DIR)/lib/modules; then \
