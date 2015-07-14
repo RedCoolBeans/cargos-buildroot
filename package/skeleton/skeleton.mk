@@ -54,6 +54,7 @@ ifneq ($(SKELETON_TARGET_GENERIC_ISSUE),)
 define SYSTEM_ISSUE
 	mkdir -p $(TARGET_DIR)/etc
 	echo "$(SKELETON_TARGET_GENERIC_ISSUE)" > $(TARGET_DIR)/etc/issue
+	echo "" >> $(TARGET_DIR)/etc/issue
 endef
 TARGET_FINALIZE_HOOKS += SYSTEM_ISSUE
 endif
