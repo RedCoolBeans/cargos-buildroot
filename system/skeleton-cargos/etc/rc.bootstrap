@@ -1014,8 +1014,6 @@ while [ /usr/bin/true ]; do
 		while true; do prompt_disk && break ; done
 		create_persistent
 		create_network_config
-		cat ${_install_log}
-		sleep 60
 		while true ; do change_root_password && break ; done
 		set_timezone
 		save_kmap
