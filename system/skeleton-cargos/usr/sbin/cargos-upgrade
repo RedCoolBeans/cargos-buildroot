@@ -66,6 +66,12 @@ cmd_exe() {
 	fi
 }
 
+# CargOS upgrade 2015.8 -> 2015.9
+upgrade_20157_to_20158() {
+	# Nothing to take care of
+	clear
+}
+
 # CargOS upgrade 2015.7 -> 2015.8
 upgrade_20157_to_20158() {
 	clear
