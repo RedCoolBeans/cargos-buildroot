@@ -1,0 +1,1031 @@
+#!/bin/bash
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/pkg/bin
+export PATH
+
+export TERM=xterm-color
+
+network_tmp=$(mktemp 2>/dev/null)
+runcmd_tmp=/tmp/cloud-init-runcmd.sh
+ 
+trap "rm -f $network_tmp" 0 1 2 5 15
+
+TITLE_PREFIX="CargOS Setup"
+_sdisks=""
+
+# Default to dhcp
+_snic=""
+_hostname="cargos.localdomain"
+_ipaddr="dhcp"
+_mask="255.255.255.0"
+_gw=""
+_kmap=""
+
+# Default to OpenDNS
+_pri_ns="208.67.220.220"
+_sec_ns="208.67.222.222"
+
+_install_log="/tmp/install.log"
+
+_cloud=0
+_ec2_special_url="http://169.254.169.254"
+_cargos_mirror="http://download.cargos.io/"
+_ci_disable_root_set=false
+_ci_disable_root=false
+_ci_any_sudo=false
+# Based on the machine type, lookup the associated CargOS platform name.
+# XXX: This currently assumes all ARMv7s are rpi2 which is easier for
+# the time being, but will not hold true when other boards are added.
+_arch=$(uname -m | sed -e 's/armv7l/rpi2/')
+
+ci_packages() {
+	OLDIFS=$IFS
+	IFS=$'\n'
+        for i in $(awk '
+		$1 ~ /^#/	{ next }
+                /packages:/	{ flag=1; next; }
+                /^(\w)+/	{ flag=0; next; }
+                flag
+        ' $1); do
+		case $i in
+			*-\ *)
+				source /etc/profile.d/pkg.sh
+				/usr/pkg/bin/pkgin -y in ${i#*- }
+			;;
+		esac
+	done
+	IFS=$OLDIFS
+}
+
+ci_disable_root() {
+	local _ret=$(awk '
+		$1 ~ /^#/	{ next }
+		/^disable_root:/	{ print $2; }
+		' $1 | tr '[:upper:]' '[:lower:]')
+	if [ -n "${_ret}" ] ; then
+		_ci_disable_root_set=true
+		case "${_ret}" in
+			false|0)
+				_ci_disable_root=false
+				;;
+			true|1)
+				_ci_disable_root=true
+				;;
+		esac
+	fi
+}
+
+ci_groups() {
+	OLDIFS=$IFS
+	IFS=$'\n'
+        for i in $(awk '
+		$1 ~ /^#/	{ next }
+                /groups:/	{ flag=1; next; }
+                /^(\w)+/	{ flag=0; next; }
+                flag
+        ' $1); do
+		case $i in
+			*-\ *:*)
+				local _gu=${i#*: }
+				local _g=${i#*- }
+				_g=${_g%:*}
+				local _g_status=0
+				if [[ $_gu == [* ]]; then
+					IFS=',' read -a _gu <<< "$_gu"
+					for _gu_entry in "${_gu[@]}"; do
+						_gu_entry=$(echo $_gu_entry | sed "s,^[ \t]*,,g")
+						_gu_entry=${_gu_entry%\]}
+						_gu_entry=${_gu_entry#\[}
+						_gu_entry=${_gu_entry%\"}
+						_gu_entry=${_gu_entry#\"}
+						_gu_entry=${_gu_entry%\'}
+						_gu_entry=${_gu_entry#\'}
+						if [ ${_g_status} -eq 0 ]; then
+							addgroup ${_g}
+							_g_status=1
+						fi
+						echo ${_g} >> /tmp/groups.${_gu_entry}
+					done
+				else
+					if [ ${_g_status} -eq 0 ]; then
+						addgroup ${_g}
+						_g_status=1
+					fi
+					echo ${_g} >> /tmp/groups.${_gu}
+				fi
+				;;
+			*-\ *) addgroup ${i#*- } ;;
+		esac
+	done
+	IFS=$OLDIFS
+}
+
+ci_users() {
+	awk '
+		$1 ~ /^#/	{ next }
+		/users:/	{ flag=1; next }
+		/(^$|^(\w)+:)/	{ flag=0 }
+		flag
+	' $1 | \
+		awk -v RS="- name:" '{ if ($1 == "-") { next }; print $0 > "/tmp/user." NR }'
+
+	OLDIFS=$IFS
+	_sudo_status=0
+	for _userf in $(ls -1 /tmp/user.*); do
+		_user=$(head -1 ${_userf} | tr -d '[[:space:]]')
+		[ -z $_user ] && rm -f ${_userf} && continue
+		_ssh_authorized_keys=""
+		_cnt=0
+
+		IFS=$'\n'
+		for i in $(cat ${_userf}); do
+			case $i in
+				*:*)
+					case $i in
+						*home*) _home=${i#*: } ;;
+						*passwd*) _passwd=${i#*: } ;;
+						*shell*) _shell=${i#*: } ;;
+						*gecos*) _gecos=${i#*: } ;;
+						*groups*) _groups=${i#*: } ;;
+						*sudo*) _sudo=${i#*: } ;;
+					esac
+				;;
+				*-\ ssh-*)
+					_ssh_authorized_keys[${_cnt}]=$(echo $i | sed "s,^[ \t]*- ,,g")
+					((_cnt++))
+				;;
+			esac
+		done
+		IFS=$OLDIFS
+
+		# Handle group settings from ci_groups()
+		if [ -e "/tmp/groups.${_user}" ]; then
+			_groups="${_groups:+${_groups},}$(cat /tmp/groups.${_user} | paste -s -d,)"
+			rm -f /tmp/groups.${_user}
+		fi
+
+		adduser -D ${_groups:+-G "${_groups}"} ${_home:+-h "${_home}"} ${_shell:+-s "${_shell}"} ${_gecos:+-g "${_gecos}"} ${_user}
+		[ $? -gt 0 ] && rm -f ${_userf} && continue
+	
+		# Set the specified password, if there is none, set a random one.	
+		if [ -n "${_passwd}" ]; then
+			echo ${_user}:${_passwd} | /usr/sbin/chpasswd -e
+		else
+			echo "${_user}:$(tr -cd '[:alnum:]' < /dev/urandom | fold -w30 | head -n1)" | /usr/sbin/chpasswd
+		fi
+
+		if [ -n "${_sudo}" ]; then
+			if [ ${_sudo_status} -eq 0 ]; then
+				source /etc/profile.d/pkg.sh
+				/usr/pkg/bin/pkgin -y in sudo
+
+				_sudo_status=1
+			fi
+			_ci_any_sudo=true
+			if [[ $_sudo == [* ]]; then
+				IFS=',' read -a _sudo <<< "$_sudo"
+				for _sudo_entry in "${_sudo[@]}"; do
+					_sudo_entry=$(echo $_sudo_entry | sed "s,^[ \t]*,,g")
+					_sudo_entry=${_sudo_entry%\]}
+					_sudo_entry=${_sudo_entry#\[}
+					_sudo_entry=${_sudo_entry%\"}
+					_sudo_entry=${_sudo_entry#\"}
+					_sudo_entry=${_sudo_entry%\'}
+					_sudo_entry=${_sudo_entry#\'}
+					echo "${_user} ${_sudo_entry}" >> /usr/pkg/etc/sudoers.d/${_user}
+				done
+			else
+				echo "${_user} ${_sudo}" > /usr/pkg/etc/sudoers.d/${_user}
+			fi
+		fi
+		if [ $_cnt -gt 0 ]; then
+			AUTHORIZED_KEYS=/home/${_user}/.ssh/authorized_keys
+			if [ ! -d `dirname $AUTHORIZED_KEYS` ]; then
+				mkdir -p -m 700 `dirname $AUTHORIZED_KEYS`
+			fi
+			_i=0
+			while ((_i < $_cnt)); do
+				echo ${_ssh_authorized_keys[$_i]} >> $AUTHORIZED_KEYS
+				((_i++))
+			done
+			if [ -f $AUTHORIZED_KEYS ]; then
+				chown -R ${_user} `dirname $AUTHORIZED_KEYS`
+				chmod 600 $AUTHORIZED_KEYS
+			fi
+		fi
+		rm -f ${_userf}
+	done
+	IFS=$OLDIFS
+}
+
+chpasswd() {
+	awk '
+		/chpasswd/		{ next; }
+		/line: \|/		{ next; }
+		/^    (\w)+:(\w)+/	{ flag=1; }
+		flag			{ e=$0; gsub(/ /, "", e); print e; }
+		!/^    (\w)+: (\w)+/	{ flag=0; }
+		!/^    (\w)+:(\w)+/	{ flag=0; }
+	' $1
+}
+
+chpasswd_expire() {
+	awk '
+		/chpasswd/		{ next; }
+		/expire:/		{ print $2; }
+	' $1
+}
+
+network_interfaces() {
+awk '
+		/network-interfaces: \|/	{ flag=1;next; }
+		/^(\w)+:/			{ flag=0; }
+		flag				{ e=$0; gsub(/^([[:space:]])+/, "", e); print e; }
+	' $1
+}
+
+ssh_pwauth() {
+	awk '
+		/ssh_pwauth:/		{ print $2; }
+	' $1
+}
+
+bootcmd() {
+	awk '
+		/bootcmd:/	{ flag=1;next; }
+		/^(\w)+:/	{ flag=0; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
+	' $1
+}
+
+runcmd() {
+	awk '
+		/runcmd:/	{ flag=1;next; }
+		/^(\w)+:/	{ flag=0; }
+		flag		{ e=$0; gsub(/^([[:space:]])+-([[:space:]])+/, "", e); print e; }
+	' $1
+}
+
+parse_cmdline() {
+	for i in $(cat /proc/cmdline); do
+		case $i in
+			cloud*)  _cloud=1;;
+		esac
+	done
+}
+
+is_cloud() {
+	local _regex="DMI:.(openstack|parallels|vmware|virtualbox|xenhvm|hyperv|rhev|ovirt|bochs)"
+	dmesg | grep -Eiq ${_regex}
+	if [ $? -eq 0 ]; then
+		[ ${_cloud} -eq 1 ] && return 0 || return 1
+	fi
+	return 1
+}
+
+# Tests whether entire string is a number.
+isdigit() {
+	[ $# -eq 1 ] || return 1
+
+	case $1 in
+  	*[!0-9]*|"") return 1;;
+	*) return 0;;
+	esac
+}
+
+# Tests network numner (num.num.num.num)
+is_inet() {
+	NET=$1
+
+	OLDIFS=$IFS
+	IFS=.
+	set -- $NET
+	a=$1
+	b=$2
+	c=$3
+	d=$4
+	IFS=$OLDIFS
+
+	isdigit "$a" || return 1
+	isdigit "$b" || return 1
+	isdigit "$c" || return 1
+	isdigit "$d" || return 1
+
+	[ -z $a ] && return 1
+	[ -z $b ] && return 1
+	[ -z $c ] && return 1
+	[ -z $d ] && return 1
+
+	[ $a -lt 0 ] && return 1
+	[ $a -gt 255 ] && return 1
+	[ $b -lt 0 ] && return 1
+	[ $b -gt 255 ] && return 1
+	[ $c -lt 0 ] && return 1
+	[ $c -gt 255 ] && return 1
+	[ $d -lt 0 ] && return 1
+	# Make sure the last field isn't the broadcast addr.
+	[ $d -ge 255 ] && return 1
+	return 0
+}
+
+is_inet6() {
+	local _address=$1
+	local _o=""
+	local _zeroes=""
+
+	while [ "$_o" != "$_address" ]; do
+		_o="$_address"
+
+		# fill all words with zeroes
+		_address="$( sed  's|:\([0-9a-f]\{3\}\):|:0\1:|g' <<< "$_address" )"
+		_address="$( sed  's|:\([0-9a-f]\{3\}\)$|:0\1|g'  <<< "$_address")"
+		_address="$( sed  's|^\([0-9a-f]\{3\}\):|0\1:|g'  <<< "$_address" )"
+
+		_address="$( sed  's|:\([0-9a-f]\{2\}\):|:00\1:|g' <<< "$_address")"
+		_address="$( sed  's|:\([0-9a-f]\{2\}\)$|:00\1|g'  <<< "$_address")"
+		_address="$( sed  's|^\([0-9a-f]\{2\}\):|00\1:|g'  <<< "$_address")"
+
+		_address="$( sed  's|:\([0-9a-f]\):|:000\1:|g'  <<< "$_address")"
+		_address="$( sed  's|:\([0-9a-f]\)$|:000\1|g'   <<< "$_address")"
+		_address="$( sed  's|^\([0-9a-f]\):|000\1:|g'   <<< "$_address")"
+	done
+
+	# now expand the ::
+	grep -qs "::" <<< "$_address"
+	if [ "$?" -eq 0 ]; then
+		_grps="$(sed  's|[0-9a-f]||g' <<< "$_address" | wc -m)"
+		((_grps--)) # carriage return
+		((_missing=8-_grps))
+		for ((i=0;i<$_missing;i++)); do
+			_zeroes="$_zeroes:0000"
+		done
+
+		# be careful where to place the :
+		_address="$( sed  's|\(.\)::\(.\)|\1'$_zeroes':\2|g'   <<< "$_address")"
+		_address="$( sed  's|\(.\)::$|\1'$_zeroes':0000|g'   <<< "$_address")"
+		_address="$( sed  's|^::\(.\)|'$_zeroes':0000:\1|g;s|^:||g'   <<< "$_address")"
+	fi
+
+	# an expanded address has 39 chars + CR
+	[ $(echo $_address | wc -m) != 40 ] && return 1
+
+	return 0
+}
+
+udev_trigger() {
+	udevadm trigger --action=add
+	udevadm settle || true
+}
+
+prompt_welcome() {
+	local _message="
+	You must answer the following questions to configure the system.
+	You will have no chance to correct your answers, so please take
+	your time and answer the questions correctly.
+
+	If you select No, the system will work without persistent storage
+	configuration.
+
+	Would you like to continue with configuration?
+	"
+
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "Welcome to the CargOS Setup Utility" \
+		--yesno "${_message}" 14 80
+}
+
+prompt_end() {
+	local _message="
+	System configuration has been completed. Thank you for using CargOS!
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Setup Utility" \
+		--msgbox "${_message}" 7 75
+}
+
+create_network_config() {
+	echo "hostname=\"$_hostname\"" >> /etc/rc.conf
+	if [ ${_ipaddr} != "dhcp" ]; then
+		echo "ifconfig_${_snic}=\"$_ipaddr$_mask\"" >> /etc/rc.conf
+		is_inet6 $_gw && _d="defaultroute6" || _d="defaultroute"
+		echo "${_d}=\"$_gw\"" >> /etc/rc.conf
+		[ -z $_pri_ns ] || echo "nameserver $_pri_ns" > /etc/resolv.conf
+		[ -z $_sec_ns ] || echo "nameserver $_sec_ns" >> /etc/resolv.conf
+		echo "${_paddr}	${_hostname}" >> /etc/hosts
+	else
+		echo "ifconfig_${_snic}=\"$_ipaddr\"" >> /etc/rc.conf
+	fi
+	/etc/rc.d/network start >> ${_install_log} 2>&1
+}
+
+prompt_nic() {
+	local _nic_cnt=0
+	while IFS=: read -r id link extra; do
+		((_nic_cnt++))
+		_nics[$_nic_cnt]=$(echo $link | tr -d '[[:space:]]')
+		_macs[$_nic_cnt]=$(ip link show $link | grep link | cut -d ' ' -f6 | sed 's/\\\:/:/g')
+		_lst[$_nic_cnt]="${_nics[${_nic_cnt}]} ${_macs[$_nic_cnt]}"
+	done < <(ip link show | grep -v link | grep -v LOOPBACK 2>/dev/null)
+	local _snicf=$(mktemp 2>/dev/null)
+	dialog --backtitle "${TITLE_PREFIX} - Networking" \
+		--title "List of usable network interfaces" \
+		--menu "Select one interface to configure" 15 80 17 \
+		${_lst[@]} 2>${_snicf}
+	_snic=$(cat ${_snicf})
+	rm -f ${_snicf}
+	[ -z ${_snic} ] && return 1
+	_hostname=$(ip link show ${_snic} | grep link | cut -d ' ' -f6 | sed 's/:/-/g')
+	dialog --backtitle "${TITLE_PREFIX} - Networking" \
+		--title "Configuration for ${_snic}" \
+		--ok-label "Save" \
+		--form "Please enter your desired configuration" \
+		15 70 0 \
+		"Hostname" 1 1 "$_hostname"			1 32 32 0 \
+		"IPv(4|6) Address or 'dhcp(6)'" 2 1 "$_ipaddr"	2 32 32 0 \
+		"Network mask or prefix" 3 1 "$_mask"		3 32 32 0 \
+		"Default gateway" 4 1 "$_gw"			4 32 32 0 \
+		"Primary DNS server" 5 1 "$_pri_ns"		5 32 32 0 \
+		"Secondary DNS server" 6 1 "$_sec_ns"		6 32 32 0 \
+		2> ${network_tmp}
+
+	_hostname=$(sed -n "1p" ${network_tmp})
+	_ipaddr=$(sed -n "2p" ${network_tmp})
+	_mask=$(sed -n "3p" ${network_tmp})
+	_gw=$(sed -n "4p" ${network_tmp})
+	_pri_ns=$(sed -n "5p" ${network_tmp})
+	_sec_ns=$(sed -n "6p" ${network_tmp})
+
+	if [ ${_ipaddr} != "dhcp" ]; then
+		[ -z ${_ipaddr} ] && return 1 || is_inet ${_ipaddr} || is_inet6 ${_ipaddr} || return 1
+		[ -z ${_mask} ] && return 1 || is_inet ${_mask} && _mask=" netmask ${_mask}"
+		[ -z ${_gw} ] && return 1 || is_inet ${_gw} || is_inet6 ${_gw} || return 1
+	else
+		_mask=""
+		_gw=""
+		_pri_ns=""
+		_sec_ns=""
+	fi
+}
+
+prompt_disk() {
+	local _disk_cnt=0
+	while IFS=: read -r disk size; do
+		((_disk_cnt++))
+		_dname[${_disk_cnt}]=$(echo $disk | cut -d ' ' -f2)
+		_dsize[${_disk_cnt}]=$(echo $size | cut -d ',' -f1 | tr -d '[[:space:]]')
+		fdisk -l ${_dname[${_disk_cnt}]} | grep -q "doesn't contain" 2>/dev/null
+		[ $? -eq 0 ] || _dsize[${_disk_cnt}]="${_dsize[${_disk_cnt}]}*"
+		_dlst[${_disk_cnt}]="${_dname[${_disk_cnt}]} ${_dsize[${_disk_cnt}]} off"
+	done < <(fdisk -l | grep Disk | grep byte 2>/dev/null)
+	local _sdisksf=$(mktemp 2>/dev/null)
+	if [ ${_disk_cnt} -eq 0 ];then
+		local _message="
+		There are no usable disk(s) available for persistent storage!
+		CargOS will only work in fallback mode!
+		"
+		dialog --backtitle "${TITLE_PREFIX} - Storage" \
+			--title "There are no usable disk(s) available!" \
+			--yesno "${_message}" 14 80
+		exit 0
+	else
+		local _message="
+		Select the disk(s) to use for BTRFS.
+		Disks marked with a * sign are in-use and will be overwritten.
+		"
+		dialog --backtitle "${TITLE_PREFIX} - Storage" \
+			--title "List of usable disks" \
+			--checklist "${_message}" 15 80 17 \
+			${_dlst[@]} 2>${_sdisksf}
+		_sdisks=$(cat ${_sdisksf})
+		rm -f ${_sdisksf}
+		[ -z ${_sdisks} ] && return 1
+
+		local _message="
+		Your BTRFS filesystem will be created with the following disk(s):
+		${_sdisks}
+	
+		This will erase *ALL DATA* on the disk(s)! Do you want to continue?	
+		"
+
+		dialog --backtitle "${TITLE_PREFIX} - Storage" \
+			--title "!!! WARNING !!!" \
+			--yesno "${_message}" 11 72
+		[ $? -ne 0 ] && return 1 || return 0
+	fi
+}
+
+create_persistent() {
+	local _cmds
+	_cmds[0]="fdisk"
+	_cmds[1]="mkfs_boot"
+	_cmds[2]="mkfs_btrfs"
+	_cmds[3]="mount"
+	_cmds[4]="bootstrap"
+	_cmds[5]="random-seed"
+
+	local _parts=$(for d in ${_sdisks} ; do echo ${d}2 ; done | xargs echo)
+
+	n=${#_cmds[*]}; 
+	i=0
+	for f in "${_cmds[@]}"
+	do
+		local _pct=$(( 100*(++i)/n ))
+		echo ${_pct}
+		case ${f} in
+		fdisk)
+			{
+			for dev in ${_sdisks}; do
+				echo -n "o.n.p.1..+1024M.a.1.n.p.2...w." | tr . "\n" | fdisk ${dev}
+			done
+			} >> ${_install_log} 2>&1
+			;;
+		mkfs_btrfs)
+			{
+			mkfs.btrfs -L cargos ${_parts}
+			udev_trigger
+			local _uuid=$(MALLOC_CHECK_=0 btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
+			mount /dev/disk/by-uuid/$_uuid /mnt
+			(cd /mnt; btrfs subvolume create root)
+			(cd /mnt; btrfs subvolume create pkg)
+			(cd /mnt; btrfs subvolume create etc)
+			(cd /mnt; btrfs subvolume create home)
+			(cd /mnt; btrfs subvolume create data)
+			(cd /mnt; btrfs subvolume create data/docker)
+			umount -f /mnt
+			} >> ${_install_log} 2>&1
+			;;
+		mkfs_boot)
+			{
+			for dev in ${_sdisks}; do
+				mkfs.ext4 ${dev}1
+			done
+			} >> ${_install_log} 2>&1
+			;;
+		mount)
+			{
+			local _uuid=$(MALLOC_CHECK_=0 btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
+			mount /dev/disk/by-uuid/$_uuid /cargos
+			mount -o subvol=pkg /dev/disk/by-uuid/$_uuid /usr/pkg
+			mount -o subvol=root /dev/disk/by-uuid/$_uuid /root
+			mount -o subvol=etc /dev/disk/by-uuid/$_uuid /etc
+			mount -o subvol=home /dev/disk/by-uuid/$_uuid /home
+			mount -o subvol=data/docker /dev/disk/by-uuid/$_uuid /var/lib/docker
+			unionfs -o allow_other,cow,use_ino,nonempty /cargos/etc=RW:/.etc=RO /etc
+			} >> ${_install_log} 2>&1
+			;;
+		bootstrap)
+			{
+			local _version=$(cat /etc/cargos-release)
+			/bin/gzip -d < /var/db/bootstrap-cargos-${_version}-${_arch}.tar.gz | /bin/tar xhf - -C /
+			/bin/bash /usr/pkg/.install/bootstrap.sh
+			rm -rf /usr/pkg/.install
+			} >> ${_install_log} 2>&1
+			;;
+		random-seed)
+			{
+			(dmesg; sysctl -a; ifconfig -a; df; hostname) >/dev/urandom 2>&1
+			dd if=/dev/urandom of=/etc/random-seed bs=512 count=1 2>/dev/null
+			chmod 600 /etc/random-seed
+			} >> ${_install_log} 2>&1
+			;;
+		esac
+	done | \
+	dialog --backtitle "${TITLE_PREFIX} - Storage" \
+		--title "Creating persistent storage" \
+		--gauge "Creating BTRFS filesystem and bootstrapping the system..." 10 70
+}
+
+change_root_password() {
+	local _password _password_re
+	local _passwordf=$(mktemp 2>/dev/null)
+	local _password_ref=$(mktemp 2>/dev/null)
+	dialog --backtitle "${TITLE_PREFIX} - Root password" \
+		--title "Password" \
+		--clear \
+		--insecure \
+		--passwordbox "Enter root's password" 10 30 2>${_passwordf}
+
+	dialog --backtitle "${TITLE_PREFIX} - Root password" \
+		--title "Retype password" \
+		--clear \
+		--insecure \
+		--passwordbox "Retype root's password" 10 30 2>${_password_ref}
+
+	_password=$(cat ${_passwordf})
+	_password_re=$(cat ${_password_ref})
+	rm -f ${_passwordf} ${_passwordf_ref}
+
+	[ X"${_password}" != X"${_password_re}" ] && return 1
+
+	passwd >/dev/null 2>&1 << EOF
+${_password}
+${_password_re}
+EOF
+}
+
+# test the first argument against the remaining ones, return success on a match
+isin() {
+	local   _a=$1 _b
+	shift
+	for _b; do
+		[[ $_a == $_b ]] && return 0
+	done
+	return 1
+}
+
+save_kmap() {
+	[ -z $_kmap ] || echo "kbdmap=\"$_kmap\"" >> /etc/rc.conf
+}
+
+prompt_localboot() {
+	local _message="
+	Would you like to be able to boot CargOS from your local disks?
+	A working internet connection is mandatory to do this!
+	First wget and grub2 will be installed with pkgin(1).
+	"
+	dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)" \
+		--title "Support boot from local disk(s)?" \
+		--yesno "${_message}" 9 70
+	[ $? -ne 0 ] && return 1
+	return 0
+}
+
+do_localboot() {
+	local _use_dialog="$1"
+	local _version=$(cat /etc/cargos-release)
+
+	/bin/cat << EOF > /tmp/grub.cfg
+set menu_color_normal=cyan/blue
+set menu_color_highlight=white/blue
+set timeout=10
+
+menuentry 'CargOS-${_version}' {
+    set background_color=black
+    linux    /bzImage-${_version} root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_version}
+}
+menuentry 'CargOS-${_version} with serial console on ttyS0' {
+    set background_color=black
+    linux    /bzImage-${_version} console=ttyS0 root=/dev/ram0 ramdisk_size=131072 quiet
+    initrd   /rootfs.squashfs-noinst-${_version}
+}
+EOF
+
+	local _cmds
+	local _c_cnt=0
+
+	local _progressbar_cmd='/bin/cat > /dev/null'
+	local _error_dialog='echo "Failed to install boot image(s)!!!"  >> ${_install_log}'
+	if [ ${_use_dialog} = 'yes' ] ; then
+		_progressbar_cmd='dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)"
+			--title "Installing grub and current CargOS release on all disks."
+			--gauge "Please wait..." 10 80'
+		_error_dialog='dialog --backtitle "${TITLE_PREFIX} - Boot from local disk(s)"
+			--title "CargOS Setup Utility"
+			--msgbox "Failed to install boot image(s)!!!" 7 75'
+	fi
+
+	_cmds[$_c_cnt]="source /etc/profile.d/pkg.sh"
+	((_c_cnt++))
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y up"
+	((_c_cnt++))
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2"
+	((_c_cnt++))
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/rootfs.squashfs-noinst-${_version} ${_cargos_mirror}/${_version}/${_arch}/rootfs.squashfs-noinst-${_version}"
+	((_c_cnt++))
+	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/bzImage-${_version} ${_cargos_mirror}/${_version}/${_arch}/bzImage-${_version}"
+
+	for _disk in ${_sdisks}; do
+		((_c_cnt++))
+		_cmds[$_c_cnt]="mount -t ext4 ${_disk}1 /boot"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="/usr/pkg/sbin/grub-install -f ${_disk}"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="cp /tmp/grub.cfg /boot/grub/grub.cfg"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="cp /tmp/rootfs.squashfs-noinst-${_version} /boot/"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="cp /tmp/bzImage-${_version} /boot/"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="umount /boot"
+	done
+
+	n=${#_cmds[*]}; 
+	i=0
+	for f in "${_cmds[@]}"
+	do
+		local _pct=$(( 100*(++i)/n ))
+		echo ${_pct}
+		eval $f >> ${_install_log} 2>&1
+	done | eval ${_progressbar_cmd} 
+
+	test -s /tmp/bzImage-${_version} -a -s /tmp/rootfs.squashfs-noinst-${_version} || \
+		eval ${_error_dialog}
+			
+	rm -f /tmp/bzImage-${_version} /tmp/rootfs.squashfs-noinst-${_version} /tmp/grub.cfg
+}
+
+prompt_kmap() {
+	local _message="
+	Would you like to change the default keymap from the default?
+	"
+	dialog --backtitle "${TITLE_PREFIX} - Keyboard map" \
+		--title "Default keymap" \
+		--yesno "${_message}" 7 70
+	[ $? -ne 0 ] && return 0
+	local _kmapfile=/tmp/kmaplist
+
+	(cd /usr/share/kmap;
+		find . | sed 's,\./,,g' | grep kmap | sort | sed 's,.kmap,,g' >${_kmapfile})
+
+	local _respf=$(mktemp 2>/dev/null)
+	local _k_cnt=0
+	for _k in $(cat ${_kmapfile}); do
+		((_k_cnt++))
+		_klist[$_k_cnt]="${_k} ${_k}"
+	done
+	dialog --backtitle "${TITLE_PREFIX} - Keyboard map" \
+		--title "Keyboard map selection" \
+		--menu "Choose an option" 20 78 16 \
+		${_klist[@]} 2>${_respf}
+	_kmap=$(cat ${_respf})
+	rm -f ${_respf}
+
+	rm -f ${_kmapfile}
+
+	[ -z $_kmap ] || loadkmap < /usr/share/kmap/${_kmap}.kmap
+}
+
+set_timezone() {
+	local _zonefile=/tmp/tzlist _zonepath _zsed _tz _zoneroot=/usr/share/zoneinfo
+
+	(cd /usr/share/zoneinfo/posix;
+		ls -1dF $(tar cvf /dev/null [A-Za-y]*) >${_zonefile})
+
+	# If the timezone file is not available,
+	# return immediately.
+
+	[[ ! -f $_zonefile ]] && return
+
+	# If configured in a previous call, return immediately
+	[[ -n $TZ ]] && return
+
+	if [[ -h /etc/localtime ]]; then
+		TZ=$(ls -l /etc/localtime 2>/dev/null)
+		TZ=${TZ#*${_zoneroot#/mnt}/}
+	fi
+
+	while :; do
+		local _respf=$(mktemp 2>/dev/null)
+		dialog --backtitle "${TITLE_PREFIX} - Timezone" \
+			--title "Timezone" \
+			--inputbox "What timezone are you in? ('?' for list)" 10 60 2>${_respf}
+		local _resp=$(cat ${_respf})
+		rm -f ${_respf}
+
+		_zonepath=${_resp%%*(/)}
+		case $_zonepath in
+		"")	continue;;
+		"?")
+			local _respf=$(mktemp 2>/dev/null)
+			local _z_cnt=0
+			for _z in $(cat ${_zonefile} | cut -d '/' -f1 | uniq | sort); do
+				((_z_cnt++))
+				_zlist[$_z_cnt]="${_z} ${_z}"
+			done
+			dialog --backtitle "${TITLE_PREFIX} - Timzone" \
+				--title "Timezone selection" \
+				--menu "Choose an option" 20 78 16 \
+				${_zlist[@]} 2>${_respf}
+			_zonepath=$(cat ${_respf})
+			rm -f ${_respf}
+			;;
+		esac
+
+		while isin "$_zonepath//" $(cat $_zonefile); do
+			_zsed=$(echo $_zonepath/ | sed 's,/,\\/,g')
+			local _respf=$(mktemp 2>/dev/null)
+			dialog --backtitle "${TITLE_PREFIX} - Timezone selection" \
+				--title "Timezone selection" \
+				--inputbox "What sub-timezone of '$_zonepath' are you in? ('?' for list)" 10 60 2>${_respf}
+			local _resp=$(cat ${_respf})
+			rm -f ${_respf}
+			_resp=${_resp%%*(/)}
+			case $_resp in
+			"")	;;
+			"?")
+				local _respf=$(mktemp 2>/dev/null)
+				local _z_cnt=0
+				for _z in $(sed -n "/^$_zsed/{s/$_zsed//;/\/./!p;}" $_zonefile); do
+					((_z_cnt++))
+					_zslist[$_z_cnt]="${_z} ${_z}"
+				done
+				dialog --backtitle "${TITLE_PREFIX} - Timezone" \
+					--title "Timezone selection" \
+					--menu "Choose an option" 20 78 16 \
+					${_zslist[@]} 2>${_respf}
+				local _resp=$(cat ${_respf})
+				rm -f ${_respf}
+				_zonepath=$_zonepath/$_resp
+				;;
+			*)	_zonepath=$_zonepath/$_resp;;
+			esac
+		done
+
+		if isin "$_zonepath" $(cat $_zonefile); then
+			TZ=${_zonepath#$_zoneroot}
+			ln -sf /usr/share/zoneinfo/$TZ /etc/localtime
+			return
+		fi
+
+		echo -n "'${_zonepath}'"
+		echo " is not a valid timezone on this system."
+	done
+
+	rm -f ${_zonefile}
+}
+
+get_ec2()
+{
+	local _tmpf=$(mktemp 2>/dev/null)
+	/usr/pkg/bin/wget -T5 -t5 ${_ec2_special_url}/$1 -O ${_tmpf} >> ${_install_log} 2>&1
+	local _ret=$(cat ${_tmpf})
+	rm -f ${_tmpf}
+	echo ${_ret}
+}
+
+handle_cloud()
+{
+	local _public_key
+
+	CS=/tmp/$RANDOM$RANDOM.cinit
+	rm -f $CS
+
+	mkdir -p $CS.rom
+	/sbin/blkid -t TYPE="iso9660" -o device | while read name; do
+		mount -o ro -t iso9660 $name $CS.rom
+		if [ -f $CS.rom/context.sh ]; then
+			sed -n "s|^ *USER_DATA *= *[\"']*\(.*\)[\"']$|\1|p" $CS.rom/context.sh > $CS
+		fi
+		if [ -f $CS.rom/ec2/latest/user-data ]; then
+			cp $CS.rom/ec2/latest/user-data $CS
+		elif [ -f $CS.rom/openstack/latest/user-data ]; then
+			cp $CS.rom/openstack/latest/user-data $CS
+		fi
+
+		[ -f $CS.rom/ec2/latest/meta-data/hostname ] && _hostname=$(cat $CS.rom/ec2/latest/meta-data/hostname)
+		[ -f $CS.rom/ec2/latest/meta-data/public-keys/0/openssh-key ] && _public_key=$(cat $CS.rom/ec2/latest/meta-data/public-keys/0/openssh-key)
+
+		umount $CS.rom
+	done
+	rmdir $CS.rom
+
+	if [ ! -f $CS ]; then
+		source /etc/profile.d/pkg.sh
+		/usr/pkg/bin/pkgin -y up
+		/usr/pkg/bin/pkgin -y in wget
+		/usr/pkg/bin/wget -T5 -t5 ${_ec2_special_url}/latest/user-data -O $CS
+
+		_hostname=$(get_ec2 "latest/meta-data/hostname")
+		_public_key=$(get_ec2 "latest/meta-data/public-keys/0/openssh-key")
+	fi
+
+	# If hostname is empty, use CargOS defaults
+	[ -z ${_hostname} ] && _hostname=$(ip link show ${_snic} | grep link | cut -d ' ' -f6 | sed 's/:/-/g')
+
+	if [[ ! -z ${_public_key} ]]; then
+		AUTHORIZED_KEYS=/root/.ssh/authorized_keys
+		if [ ! -d `dirname $AUTHORIZED_KEYS` ]; then
+			mkdir -p -m 700 `dirname $AUTHORIZED_KEYS`
+		fi
+		echo ${_public_key} > $AUTHORIZED_KEYS
+		if [ -f $AUTHORIZED_KEYS ]; then
+			chmod 600 $AUTHORIZED_KEYS
+		fi
+	fi
+
+	# If user data is not provided, nothing to be done
+	[[ ! -s $CS ]] && rm -f $CS && return 1
+
+	# Decode user data (if not already decoded)
+	if ! [[ "`head -c 12 $CS`" == "Content-Type" || "`head -c 1 $CS`" == "#" ]]; then
+		echo "Data source seems to be encoded in base64. I will decode it."
+		base64 -d $CS > $CS.new && mv $CS.new $CS
+		rm -f $CS.new
+	fi
+
+	# Parse MIME encoding if present
+	BOUNDARY=`grep '^Content-Type: *multipart/mixed; *boundary' $CS|head -1|sed -n "s|^Content-Type: *multipart/mixed; *boundary *= *[\"']*\([^\"']*\)[\"']*$|\1|p"`
+	if [ -n "$BOUNDARY" ]; then
+		echo "Data source seems to be encoded in MIME format. I will decode it."
+		awk -v B="$BOUNDARY" -v F="$CS." '{if($0=="--"B"--"){exit}if($0=="--"B){k=k+1;f=F k;getline;s=1;printf "" > f};if(s==1)print $0 >> f}' $CS
+		rm -f $CS
+	fi
+
+	# Execute contextualization commands
+	for f in $CS*; do
+		echo "Processing $f ..." >> ${_install_log}
+		# Skip various headers (if present)
+		if [ "`head -c 11 $f`" == "Merge-Type:" -o "`head -c 13 $f`" == "MIME-Version:" -o "`head -c 13 $f`" == "Content-Type:" -o "`head -c 20 $f`" == "Content-Disposition:" -o "`head -c 26 $f`" == "Content-Transfer-encoding:" ]; then
+			awk '{if($0==""){s=1;getline;}if(s==1)print $0}' $f > $f.new
+			mv $f.new $f
+		fi
+
+		# Skip files not containing #
+		[ "`head -c 1 $f`" == "#" ] || continue
+
+		# Execute contextualization command
+		FIRST_LINE="`head -1 $f`"
+		if [ "$FIRST_LINE" == "#!/bin/bash" ]; then
+			echo "Processing $f as bash script" >> ${_install_log}
+			bash $f
+		elif [ "$FIRST_LINE" == "#!/bin/sh" ]; then
+			echo "Processing $f as sh script" >> ${_install_log}
+			sh $f
+		elif [ "$FIRST_LINE" == "#cloud-config" ]; then
+			echo "Processing $f as cloud config" >> ${_install_log}
+			# Handle bootcmd
+			while read -r line; do
+				eval $line
+			done < <(bootcmd $f)
+
+			# Handle chpasswd
+			local _chpasswd=$(mktemp 2>/dev/null)
+			chpasswd $f >${_chpasswd}
+			[ -z ${_chpasswd} ] || /usr/sbin/chpasswd < ${_chpasswd}
+			rm -f ${_chpasswd}
+
+			# Handle runcmd, append to $runcmd_tmp
+			while read -r line; do
+				echo $line >> ${runcmd_tmp}
+			done < <(runcmd $f)
+
+			# Handle disable_root
+			ci_disable_root $f
+
+			# Handle groups
+			ci_groups $f
+
+			# Handle users
+			ci_users $f
+
+			# Handle packages
+			ci_packages $f
+		fi
+	done
+
+	echo "_ci_disable_root_set=${_ci_disable_root_set}" >> ${_install_log}
+	echo "_ci_disable_root=${_ci_disable_root}" >> ${_install_log}
+	echo "_ci_any_sudo=${_ci_any_sudo}" >> ${_install_log}
+	if ${_ci_disable_root_set} ; then
+		# Explicitely specifying disable_root has precedence
+		${_ci_disable_root} && passwd -l root
+	else
+		${_ci_any_sudo} && passwd -l root
+	fi
+	rm -f $CS*
+}
+
+while [ /usr/bin/true ]; do
+	parse_cmdline
+	if is_cloud; then
+		_sdisks=$(fdisk -l | grep Disk | grep byte | cut -d ' ' -f2 | tr -d ':')
+		_snic=$(ip link show | grep -v link | grep -v LOOPBACK | cut -d ' ' -f2 | tr -d ':' | head -1)
+
+		create_persistent
+
+		echo -n "Configuring system based on cloud-config..."
+		# Use dhcp to pre-configure networking then fetch cloud configuration
+		# and kill networking
+		/sbin/udhcpc -i ${_snic} -p /var/run/udhcpc-${_snic}.pid >> ${_install_log} 2>&1
+		handle_cloud >> ${_install_log} 2>&1
+		kill $(cat /var/run/udhcpc-${_snic}.pid) >> ${_install_log} 2>&1
+		echo "done."
+
+		create_network_config
+
+		# XXX Enforce local boot on OpenStack for the time being
+		dmesg | grep -qi openstack && do_localboot no
+	else
+		prompt_welcome
+		[ $? -ne 0 ] && exit 1
+		prompt_kmap
+		while true; do prompt_nic && break ; done
+		while true; do prompt_disk && break ; done
+		create_persistent
+		create_network_config
+		while true ; do change_root_password && break ; done
+		set_timezone
+		save_kmap
+		prompt_localboot && do_localboot yes || :
+	fi
+
+	/etc/rc.d/network stop >/dev/null 2>&1
+
+	is_cloud || prompt_end
+
+	break
+done
+
+# On OpenStack, stuff the log to /dev/ttyS0 - can be retrieved via nova console-log
+dmesg | grep -qi openstack && cat ${_install_log} > /dev/ttyS0

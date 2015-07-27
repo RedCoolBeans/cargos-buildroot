@@ -21,7 +21,7 @@ endif
 
 define SKELETON_INSTALL_TARGET_CMDS
 	rsync -a --ignore-times $(SYNC_VCS_EXCLUSIONS) \
-		--chmod=u=rwX,go=rX --exclude .empty --exclude '*~' \
+		--chmod=u=rwX,go=rX --exclude .empty --exclude '*~' --exclude 'rc.bootstrap*' \
 		$(SKELETON_PATH)/ $(TARGET_DIR)/
 	$(INSTALL) -m 0644 support/misc/target-dir-warning.txt \
 		$(TARGET_DIR_WARNING_FILE)
@@ -38,6 +38,12 @@ SKELETON_TARGET_GENERIC_GETTY_PORT = $(call qstrip,$(BR2_TARGET_GENERIC_GETTY_PO
 SKELETON_TARGET_GENERIC_GETTY_BAUDRATE = $(call qstrip,$(BR2_TARGET_GENERIC_GETTY_BAUDRATE))
 SKELETON_TARGET_GENERIC_GETTY_TERM = $(call qstrip,$(BR2_TARGET_GENERIC_GETTY_TERM))
 SKELETON_TARGET_GENERIC_GETTY_OPTIONS = $(call qstrip,$(BR2_TARGET_GENERIC_GETTY_OPTIONS))
+
+define RC_BOOTSTRAP
+	$(INSTALL) -m 0644 $(SKELETON_PATH)/etc/rc.bootstrap-$(BR2_PKGSRC_ARCH) \
+		$(TARGET_DIR)/etc/rc.bootstrap
+endef
+TARGET_FINALIZE_HOOKS += RC_BOOTSTRAP
 
 ifneq ($(SKELETON_TARGET_GENERIC_ISSUE),)
 define SYSTEM_ISSUE
