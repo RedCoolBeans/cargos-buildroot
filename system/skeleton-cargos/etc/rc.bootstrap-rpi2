@@ -411,7 +411,7 @@ create_network_config() {
 		echo "${_d}=\"$_gw\"" >> /etc/rc.conf
 		[ -z $_pri_ns ] || echo "nameserver $_pri_ns" > /etc/resolv.conf
 		[ -z $_sec_ns ] || echo "nameserver $_sec_ns" >> /etc/resolv.conf
-		echo "${_paddr}	${_hostname}" >> /etc/hosts
+		echo "${_ipaddr}	${_hostname}" >> /etc/hosts
 	else
 		echo "ifconfig_${_snic}=\"$_ipaddr\"" >> /etc/rc.conf
 	fi
