@@ -77,7 +77,7 @@ upgrade_20157_to_20158() {
 	PKG_PATH=http://download.cargos.io/$(cat /etc/cargos-release)/$(uname -m)/packages/All
 	/usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug
 	rm -rf /usr/pkg/var/chroot/sshd && mkdir -p /usr/pkg/var/chroot/sshd
-	/usr/pkg/sbin/pkg_delete -f openssl	
+	/usr/pkg/sbin/pkg_delete -f openssl
 	for p in $(/usr/pkg/sbin/pkg_info | cut -d ' ' -f1 | sed 's/.[^-]*$//')
 	do
 		PKG_PATH=${PKG_PATH} /usr/pkg/sbin/pkg_add -U $p
@@ -86,7 +86,7 @@ upgrade_20157_to_20158() {
 		/usr/pkg/bin/pkgin -f up
 	/bin/sync
 	_message="
-	The upgrade requires a reboot. Do you want to reboot now?!
+	The upgrade requires a reboot. Do you want to reboot now?
 	"
 	dialog --backtitle "${TITLE_PREFIX}" \
 		--title "CargOS Upgrade Utility" \
@@ -117,7 +117,7 @@ cargos_upgrade() {
 		clear && exit 0
 	fi
 	_message="
-	Do you want to proceed with the upgrade from ${VERSION} to ${_cver} ?!
+	Do you want to proceed with the upgrade from ${VERSION} to ${_cver} ?
 	"
 	dialog --backtitle "${TITLE_PREFIX}" \
 		--title "CargOS Upgrade Utility" \
