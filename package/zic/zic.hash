@@ -1,1 +1,2 @@
-sha256	e9c775bb76c9700521ada77776277c25f8650a22b56d46c9f00f4147970ef13e  tzcode2014d.tar.gz
+# From 2015f release anouncement.  See http://mm.icann.org/pipermail/tz-announce/2015-August/000033.html
+sha512  5cfbebde8a0be57e8388a7b6d35aeba99130a72c1a41f9bbd5d5864511a473aa5e9320ab21055b4383e64b3b9d7682c0d30377ce8407619987be672436014710  tzcode2015f.tar.gz
