@@ -6,7 +6,7 @@
 
 KMAPS_VERSION = 6.x
 KMAPS_SOURCE = kmaps.tcz
-KMAPS_SITE = http://distro.ibiblio.org/tinycorelinux/6.x/x86/tcz/
+KMAPS_SITE = http://distro.ibiblio.org/tinycorelinux/6.x/x86/tcz
 KMAPS_DEPENDENCIES = busybox
 KMAPS_LICENSE = GPL
 

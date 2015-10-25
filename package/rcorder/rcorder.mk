@@ -5,7 +5,7 @@
 ################################################################################
 
 RCORDER_VERSION = 20150312
-RCORDER_SITE = http://nerd.hu/
+RCORDER_SITE = http://nerd.hu
 RCORDER_SOURCE = rcorder-$(RCORDER_VERSION).tar.gz
 
 # take precedence over busybox implementation
