@@ -55,7 +55,7 @@ SKELETON_TARGET_GENERIC_GETTY_OPTIONS = $(call qstrip,$(BR2_TARGET_GENERIC_GETTY
 
 define RC_BOOTSTRAP
 	$(INSTALL) -m 0744 $(SKELETON_PATH)/etc/rc.bootstrap-$(BR2_PKGSRC_ARCH) \
-		$(TARGET_DIR)/etc/rc.bootstrap
+		$(TARGET_DIR)/etc/rc.bootstrap || true
 endef
 TARGET_FINALIZE_HOOKS += RC_BOOTSTRAP
 
