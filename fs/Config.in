@@ -2,5 +2,6 @@ menu "Filesystem images"
 
 source "fs/squashfs/Config.in"
 source "fs/tar/Config.in"
+source "fs/docker/Config.in"
 
 endmenu

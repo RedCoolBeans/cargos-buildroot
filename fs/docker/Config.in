@@ -1,0 +1,8 @@
+config BR2_TARGET_ROOTFS_DOCKER
+	bool "import the root filesystem to docker"
+	default n
+
+config BR2_TARGET_ROOTFS_DOCKER_NAME
+        string "name of the docker image"
+        depends on BR2_TARGET_ROOTFS_DOCKER
+        default "parcel"
