@@ -30,6 +30,7 @@ menu "Filesystem and flash utilities"
 	source "package/e2fsprogs/Config.in"
 	source "package/squashfs/Config.in"
 	source "package/unionfs/Config.in"
+	source "package/xfsprogs/Config.in"
 endmenu
 
 menu "Hardware handling"
