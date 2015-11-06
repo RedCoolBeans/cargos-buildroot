@@ -35,22 +35,19 @@ rc_preprocess()
 	fi
 
 	echo 'Mounting all file systems...'
-	modprobe fuse
-	modprobe ext4
-	modprobe btrfs
-	MALLOC_CHECK_=0 btrfs fi show | grep -q cargos
-	if [ $? -gt 0 ]; then
+
+	lvscan 2>/dev/null
+	vgchange -a y cargos 2>/dev/null
+
+	if [ ! -e /dev/cargos/etc ]; then
 		/etc/rc.bootstrap
 	else
-		btrfs device scan >/dev/null
-		local _uuid=$(btrfs fi show | grep uuid | cut -d ':' -f3 | tr -d '[[:space:]]')
-		mount /dev/disk/by-uuid/$_uuid /cargos
-		mount -o subvol=pkg /dev/disk/by-uuid/$_uuid /usr/pkg
-		mount -o subvol=root /dev/disk/by-uuid/$_uuid /root
-		mount -o subvol=etc /dev/disk/by-uuid/$_uuid /etc
-		mount -o subvol=home /dev/disk/by-uuid/$_uuid /home
-		mount -o subvol=data/docker /dev/disk/by-uuid/$_uuid /var/lib/docker
-		unionfs -o allow_other,cow,use_ino,nonempty /cargos/etc=RW:/.etc=RO /etc
+		mount -t xfs /dev/cargos/etc /cargos
+		mount -t xfs /dev/cargos/pkg /usr/pkg
+		mount -t xfs /dev/cargos/root /root
+		mount -t xfs /dev/cargos/home /home
+		mount -t xfs /dev/cargos/docker /var/lib/docker
+		mount -t overlay overlay -olowerdir=/.etc,upperdir=/cargos/etc,workdir=/cargos/etc-work /etc
 	fi
 	mount -t tmpfs -o uid=0,gid=0,mode=0755 cgroup /sys/fs/cgroup
 	(cd /sys/fs/cgroup;
@@ -430,7 +427,7 @@ rc_postprocess_metadata()
 		if [ -n "$rc_failures" ]; then
 			rc_log_message "[failures]"
 			msg="The following components reported failures:"
-			msg="${msg}${nl}$( echo "    ${rc_failures}" | fmt )"
+			msg="${msg}${nl}$( echo "    ${rc_failures}" )"
 			msg="${msg}${nl}See ${RC_LOG_FILE} for more information."
 			rc_log_message "${msg}"
 			printf "%s\n" "${msg}"
