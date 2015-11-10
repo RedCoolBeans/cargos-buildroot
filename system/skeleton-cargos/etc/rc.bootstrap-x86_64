@@ -13,6 +13,20 @@ trap "rm -f $network_tmp" 0 1 2 5 15
 TITLE_PREFIX="CargOS Setup"
 _sdisks=""
 
+# Default LVM and filesystem layout
+_boot_fs=ext4
+_boot_size=1024M
+_docker_fs=ext4
+_docker_size=50%FREE
+_etc_fs=xfs
+_etc_size=128M
+_home_fs=xfs
+_home_size=1G
+_pkg_fs=xfs
+_pkg_size=1G
+_root_fs=xfs
+_root_size=1G
+
 # Default to dhcp
 _snic=""
 _hostname="cargos.localdomain"
@@ -521,7 +535,7 @@ create_persistent() {
 	_cmds[2]="pvcreate"
 	_cmds[3]="vgcreate"
 	_cmds[4]="lvcreate"
-	_cmds[5]="mkfs_xfs"
+	_cmds[5]="mkfs_lvm"
 	_cmds[6]="mount"
 	_cmds[7]="bootstrap"
 	_cmds[8]="random-seed"
@@ -538,7 +552,7 @@ create_persistent() {
 		fdisk)
 			{
 			for dev in ${_sdisks}; do
-				echo -n "o.n.p.1..+1024M.n.p.2...t.2.8e.w." | tr . "\n" | fdisk ${dev}
+				echo -n "o.n.p.1..+${_boot_size}.n.p.2...t.2.8e.w." | tr . "\n" | fdisk ${dev}
 			done
 			} >> ${_install_log} 2>&1
 			;;
@@ -554,34 +568,35 @@ create_persistent() {
 			;;
 		lvcreate)
 			{
-			lvcreate -An -L 128M cargos -n etc
-			lvcreate -An -L 1G cargos -n pkg
-			lvcreate -An -L 1G cargos -n root
-			lvcreate -An -L 1G cargos -n home 
-			lvcreate -An -l 50%FREE cargos -n docker
+			lvcreate -An -L ${_etc_size} cargos -n etc
+			lvcreate -An -L ${_pkg_size} cargos -n pkg
+			lvcreate -An -L ${_root_size} cargos -n root
+			lvcreate -An -L ${_home_size} cargos -n home 
+			lvcreate -An -l ${_docker_size} cargos -n docker
 			} >> ${_install_log} 2>&1
 			;;
-		mkfs_xfs)
+		mkfs_lvm)
 			{
 			for _x in etc pkg root home docker; do
-				mkfs.xfs /dev/cargos/${_x}
+				eval _f=\${_${_x}_fs}
+				mkfs.${_f} /dev/cargos/${_x}
 			done
 			} >> ${_install_log} 2>&1
 			;;
 		mkfs_boot)
 			{
 			for dev in ${_sdisks}; do
-				mkfs.ext4 ${dev}1
+				mkfs.${_boot_fs} ${dev}1
 			done
 			} >> ${_install_log} 2>&1
 			;;
 		mount)
 			{
-			mount -t xfs /dev/cargos/etc /cargos
-			mount -t xfs /dev/cargos/pkg /usr/pkg
-			mount -t xfs /dev/cargos/root /root
-			mount -t xfs /dev/cargos/home /home
-			mount -t xfs /dev/cargos/docker /var/lib/docker
+			mount /dev/cargos/etc /cargos
+			mount /dev/cargos/pkg /usr/pkg
+			mount /dev/cargos/root /root
+			mount /dev/cargos/home /home
+			mount /dev/cargos/docker /var/lib/docker
 			mkdir -p /cargos/etc /cargos/etc-work
 			mount -t overlay overlay -olowerdir=/.etc,upperdir=/cargos/etc,workdir=/cargos/etc-work /etc
 			} >> ${_install_log} 2>&1

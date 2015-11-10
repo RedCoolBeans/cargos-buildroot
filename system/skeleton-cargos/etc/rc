@@ -42,11 +42,11 @@ rc_preprocess()
 	if [ ! -e /dev/cargos/etc ]; then
 		/etc/rc.bootstrap
 	else
-		mount -t xfs /dev/cargos/etc /cargos
-		mount -t xfs /dev/cargos/pkg /usr/pkg
-		mount -t xfs /dev/cargos/root /root
-		mount -t xfs /dev/cargos/home /home
-		mount -t xfs /dev/cargos/docker /var/lib/docker
+		mount /dev/cargos/etc /cargos
+		mount /dev/cargos/pkg /usr/pkg
+		mount /dev/cargos/root /root
+		mount /dev/cargos/home /home
+		mount /dev/cargos/docker /var/lib/docker
 		mount -t overlay overlay -olowerdir=/.etc,upperdir=/cargos/etc,workdir=/cargos/etc-work /etc
 	fi
 	mount -t tmpfs -o uid=0,gid=0,mode=0755 cgroup /sys/fs/cgroup
