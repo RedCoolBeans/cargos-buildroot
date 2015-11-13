@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# $NetBSD: sysdb,v 1.24 2012/06/03 21:42:45 joerg Exp $
+#
+
+# PROVIDE: sysdb
+# REQUIRE: root 
+# BEFORE:  DAEMON
+
+$_rc_subr_loaded . /etc/rc.subr
+
+name="sysdb"
+rcvar=$name
+start_cmd="sysdb_start"
+stop_cmd=":"
+extra_commands="uwtmp"
+uwtmp_cmd="build_uwtmp"
+echo=:
+
+sysdb_start()
+{
+	echo -n "Building databases:"
+	echo=echo
+	comma=" "
+	$uwtmp_cmd
+	echo "."
+}
+
+build_uwtmp()
+{
+	local i
+	for i in u w; do
+		if [ ! -f /var/run/${i}tmp ]; then
+			$echo -n "${comma}${i}tmp"
+			comma=", "
+			install -c -m 664 -g utmp /dev/null /var/run/${i}tmp
+		fi
+	done
+}
+
+load_rc_config $name
+run_rc_command "$1"
