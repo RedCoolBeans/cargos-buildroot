@@ -228,7 +228,7 @@ for _version in ${_rver} ${_cver}; do
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 done
 
-for i in $(btrfs fi show | grep path | awk '{print $8}'); do
+for i in $(pvs --noheadings | awk '{print $1}'); do
 	_disk=$(echo $i | tr -d '[[:digit:]]')
 	echo
 	echo -n "* Running filesystem check on ${_disk}1... "
