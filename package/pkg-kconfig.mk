@@ -35,6 +35,7 @@ $(call inner-generic-package,$(1),$(2),$(3),$(4))
 $(2)_KCONFIG_EDITORS ?= menuconfig
 $(2)_KCONFIG_OPTS ?=
 $(2)_KCONFIG_FIXUP_CMDS ?=
+$(2)_KCONFIG_FRAGMENT_FILES ?=
 
 # The config file as well as the fragments could be in-tree, so before
 # depending on them the package should be extracted (and patched) first.
@@ -56,8 +57,8 @@ $$($(2)_KCONFIG_FILE) $$($(2)_KCONFIG_FRAGMENT_FILES): | $(1)-patch
 		fi; \
 	done
 
-# The .config file is obtained by copying it from the specified source
-# configuration file, after the package has been patched.
+# The specified source configuration file and any additional configuration file
+# fragments are merged together to .config, after the package has been patched.
 # Since the file could be a defconfig file it needs to be expanded to a
 # full .config first. We use 'make oldconfig' because this can be safely
 # done even when the package does not support defconfigs.
@@ -177,6 +178,10 @@ $(1)-update-config: $(1)-check-configuration-done
 # $(1)-update-config, the reference for 'touch' is _not_ the file from which
 # we copy.
 $(1)-update-defconfig: $(1)-savedefconfig
+	@$$(if $$($(2)_KCONFIG_FRAGMENT_FILES), \
+		echo "Unable to perform $(1)-update-defconfig when fragment files are set"; exit 1)
+	@$$(if $$($(2)_KCONFIG_DEFCONFIG), \
+		echo "Unable to perform $(1)-update-defconfig when using a defconfig rule"; exit 1)
 	cp -f $$($(2)_DIR)/defconfig $$($(2)_KCONFIG_FILE)
 	touch --reference $$($(2)_DIR)/.config $$($(2)_KCONFIG_FILE)
 
