@@ -16,7 +16,7 @@ _sdisks=""
 # Default LVM and filesystem layout
 _boot_fs=ext4
 _boot_size=1024M
-_docker_fs=ext4
+_docker_fs=xfs
 _docker_size=50%FREE
 _etc_fs=xfs
 _etc_size=128M
