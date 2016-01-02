@@ -570,7 +570,7 @@ define CARGOS_FIXUP
 	# Copy for persistent storage
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
-	cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
+	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
 		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)
 	rm -f $(TARGET_DIR)/System.map
 endef
