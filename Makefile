@@ -2,7 +2,7 @@
 #
 # Copyright (C) 1999-2005 by Erik Andersen <andersen@codepoet.org>
 # Copyright (C) 2006-2014 by the Buildroot developers <buildroot@uclibc.org>
-# Copyright (C) 2014 by the Buildroot developers <buildroot@buildroot.org>
+# Copyright (C) 2014-2015 by the Buildroot developers <buildroot@buildroot.org>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -178,7 +178,7 @@ else
   $(shell echo BR2_EXTERNAL ?= $(BR2_EXTERNAL) > $(BR2_EXTERNAL_FILE))
 endif
 
-# To make sure the the environment variable overrides the .config option,
+# To make sure that the environment variable overrides the .config option,
 # set this before including .config.
 ifneq ($(BR2_DL_DIR),)
 DL_DIR := $(BR2_DL_DIR)
@@ -197,6 +197,7 @@ TARGET_DIR := $(BASE_DIR)/target
 # initial definition so that 'make clean' works for most users, even without
 # .config. HOST_DIR will be overwritten later when .config is included.
 HOST_DIR := $(BASE_DIR)/host
+GRAPHS_DIR := $(BASE_DIR)/graphs
 
 LEGAL_INFO_DIR = $(BASE_DIR)/legal-info
 REDIST_SOURCES_DIR_TARGET = $(LEGAL_INFO_DIR)/sources
@@ -355,7 +356,7 @@ KERNEL_ARCH := $(shell echo "$(ARCH)" | sed -e "s/-.*//" \
 	-e s/arcle/arc/ \
 	-e s/arceb/arc/ \
 	-e s/arm.*/arm/ -e s/sa110/arm/ \
-	-e s/aarch64/arm64/ \
+	-e s/aarch64.*/arm64/ \
 	-e s/bfin/blackfin/ \
 	-e s/parisc64/parisc/ \
 	-e s/powerpc64.*/powerpc/ \
@@ -415,9 +416,6 @@ endif
 include package/Makefile.in
 include support/dependencies/dependencies.mk
 
-# We also need the various per-package makefiles, which also add
-# each selected package to TARGETS if that package was selected
-# in the .config file.
 include toolchain/*.mk
 include toolchain/*/*.mk
 
@@ -484,11 +482,12 @@ STRIP_FIND_CMD += -type f \( -perm /111 -o -name '*.so*' \)
 # file exclusions:
 # - libpthread.so: a non-stripped libpthread shared library is needed for
 #   proper debugging of pthread programs using gdb.
+# - ld.so: a non-stripped dynamic linker library is needed for valgrind
 # - kernel modules (*.ko): do not function properly when stripped like normal
 #   applications and libraries. Normally kernel modules are already excluded
 #   by the executable permission check above, so the explicit exclusion is only
 #   done for kernel modules with incorrect permissions.
-STRIP_FIND_CMD += -not \( $(call findfileclauses,libpthread*.so* *.ko $(call qstrip,$(BR2_STRIP_EXCLUDE_FILES))) \) -print
+STRIP_FIND_CMD += -not \( $(call findfileclauses,libpthread*.so* ld-*.so* *.ko $(call qstrip,$(BR2_STRIP_EXCLUDE_FILES))) \) -print0
 
 ifeq ($(BR2_ECLIPSE_REGISTER),y)
 define TOOLCHAIN_ECLIPSE_REGISTER
@@ -533,6 +532,11 @@ ifeq ($(BR2_ENABLE_LOCALE_PURGE),y)
 LOCALE_WHITELIST = $(BUILD_DIR)/locales.nopurge
 LOCALE_NOPURGE = $(call qstrip,$(BR2_ENABLE_LOCALE_WHITELIST))
 
+# This piece of junk does the following:
+# First collect the whitelist in a file.
+# Then go over all the locale dirs and for each subdir, check if it exists
+# in the whitelist file. If it doesn't, kill it.
+# Finally, specifically for X11, regenerate locale.dir from the whitelist.
 define PURGE_LOCALES
 	rm -f $(LOCALE_WHITELIST)
 	for i in $(LOCALE_NOPURGE) locale-archive; do echo $$i >> $(LOCALE_WHITELIST); done
@@ -544,6 +548,16 @@ define PURGE_LOCALES
 			grep -qx $${langdir##*/} $(LOCALE_WHITELIST) || rm -rf $$langdir; \
 		done; \
 	done
+	if [ -d $(TARGET_DIR)/usr/share/X11/locale ]; \
+	then \
+		for lang in $(LOCALE_NOPURGE); \
+		do \
+			if [ -f $(TARGET_DIR)/usr/share/X11/locale/$$lang/XLC_LOCALE ]; \
+			then \
+				echo "$$lang/XLC_LOCALE: $$lang"; \
+			fi \
+		done > $(TARGET_DIR)/usr/share/X11/locale/locale.dir; \
+	fi
 endef
 TARGET_FINALIZE_HOOKS += PURGE_LOCALES
 endif
@@ -556,6 +570,9 @@ define CARGOS_FIXUP
 	# Copy for persistent storage
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
+	cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
+		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)
+	rm -f $(TARGET_DIR)/System.map
 endef
 TARGET_REFINALIZE_HOOKS += CARGOS_FIXUP
 
@@ -578,7 +595,7 @@ ifneq ($(BR2_PACKAGE_ZSH),y)
 	rm -rf $(TARGET_DIR)/usr/share/zsh
 endif
 	rm -rf $(TARGET_DIR)/usr/share/gtk-doc
-	$(STRIP_FIND_CMD) | xargs $(STRIPCMD) 2>/dev/null || true
+	$(STRIP_FIND_CMD) | xargs -0 $(STRIPCMD) 2>/dev/null || true
 	if test -d $(TARGET_DIR)/lib/modules; then \
 		find $(TARGET_DIR)/lib/modules -type f -name '*.ko' -print0 | \
 		xargs -0 -r $(KSTRIPCMD); fi
@@ -590,6 +607,11 @@ ifeq ($(BR2_TOOLCHAIN_HAS_THREADS),y)
 	find $(TARGET_DIR)/lib -type f -name 'libpthread*.so*' | \
 		xargs -r $(STRIPCMD) $(STRIP_STRIP_DEBUG)
 endif
+
+# Valgrind needs ld.so with enough information, so only strip
+# debugging symbols.
+	find $(TARGET_DIR)/lib -type f -name 'ld-*.so*' | \
+		xargs -r $(STRIPCMD) $(STRIP_STRIP_DEBUG)
 
 	mkdir -p $(TARGET_DIR)/etc
 	# Mandatory configuration file and auxiliary cache directory
@@ -645,7 +667,7 @@ legal-info-prepare: $(LEGAL_INFO_DIR)
 	@$(call legal-warning,the Buildroot source code has not been saved)
 	@cp $(BR2_CONFIG) $(LEGAL_INFO_DIR)/buildroot.config
 
-legal-info: dirs legal-info-clean legal-info-prepare $(PACKAGES_LEGAL_INFO) \
+legal-info: dirs legal-info-clean legal-info-prepare $(foreach p,$(PACKAGES),$(p)-all-legal-info) \
 		$(REDIST_SOURCES_DIR_TARGET) $(REDIST_SOURCES_DIR_HOST)
 	@cat support/legal-info/README.header >>$(LEGAL_REPORT)
 	@if [ -r $(LEGAL_WARNINGS) ]; then \
@@ -659,14 +681,14 @@ show-targets:
 	@echo $(PACKAGES) $(TARGETS_ROOTFS)
 
 graph-build: $(O)/build/build-time.log
-	@install -d $(O)/graphs
+	@install -d $(GRAPHS_DIR)
 	$(foreach o,name build duration,./support/scripts/graph-build-time \
 					--type=histogram --order=$(o) --input=$(<) \
-					--output=$(O)/graphs/build.hist-$(o).$(BR_GRAPH_OUT) \
+					--output=$(GRAPHS_DIR)/build.hist-$(o).$(BR_GRAPH_OUT) \
 					$(if $(BR2_GRAPH_ALT),--alternate-colors)$(sep))
 	$(foreach t,packages steps,./support/scripts/graph-build-time \
 				   --type=pie-$(t) --input=$(<) \
-				   --output=$(O)/graphs/build.pie-$(t).$(BR_GRAPH_OUT) \
+				   --output=$(GRAPHS_DIR)/build.pie-$(t).$(BR_GRAPH_OUT) \
 				   $(if $(BR2_GRAPH_ALT),--alternate-colors)$(sep))
 
 graph-depends-requirements:
@@ -674,11 +696,11 @@ graph-depends-requirements:
 		{ echo "ERROR: The 'dot' program from Graphviz is needed for graph-depends" >&2; exit 1; }
 
 graph-depends: graph-depends-requirements
-	@$(INSTALL) -d $(O)/graphs
+	@$(INSTALL) -d $(GRAPHS_DIR)
 	@cd "$(CONFIG_DIR)"; \
 	$(TOPDIR)/support/scripts/graph-depends $(BR2_GRAPH_DEPS_OPTS) \
-	|tee $(BASE_DIR)/graphs/$(@).dot \
-	|dot $(BR2_GRAPH_DOT_OPTS) -T$(BR_GRAPH_OUT) -o $(BASE_DIR)/graphs/$(@).$(BR_GRAPH_OUT)
+	|tee $(GRAPHS_DIR)/$(@).dot \
+	|dot $(BR2_GRAPH_DOT_OPTS) -T$(BR_GRAPH_OUT) -o $(GRAPHS_DIR)/$(@).$(BR_GRAPH_OUT)
 
 graph-size:
 	$(Q)mkdir -p $(GRAPHS_DIR)
@@ -733,44 +755,49 @@ nconfig: $(BUILD_DIR)/buildroot-config/nconf outputmakefile
 config: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 
+# For the config targets that automatically select options, we pass
+# SKIP_LEGACY=y to disable the legacy options. However, in that case
+# no values are set for the legacy options so a subsequent oldconfig
+# will query them. Therefore, run an additional olddefconfig.
+
 oldconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@$(COMMON_CONFIG_ENV) $< --oldconfig $(CONFIG_CONFIG_IN)
 
 randconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
-	@$(COMMON_CONFIG_ENV) $< --randconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --randconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 allyesconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
-	@$(COMMON_CONFIG_ENV) $< --allyesconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allyesconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 allnoconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
-	@$(COMMON_CONFIG_ENV) $< --allnoconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allnoconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 randpackageconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@grep -v BR2_PACKAGE_ $(BR2_CONFIG) > $(CONFIG_DIR)/.config.nopkg
-	@grep '^config BR2_PACKAGE_' Config.in.legacy | \
-		while read config pkg; do \
-		echo "# $$pkg is not set" >> $(CONFIG_DIR)/.config.nopkg; done
-	@$(COMMON_CONFIG_ENV) \
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y \
 		KCONFIG_ALLCONFIG=$(CONFIG_DIR)/.config.nopkg \
 		$< --randconfig $(CONFIG_CONFIG_IN)
 	@rm -f $(CONFIG_DIR)/.config.nopkg
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 allyespackageconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@grep -v BR2_PACKAGE_ $(BR2_CONFIG) > $(CONFIG_DIR)/.config.nopkg
-	@grep '^config BR2_PACKAGE_' Config.in.legacy | \
-		while read config pkg; do \
-		echo "# $$pkg is not set" >> $(CONFIG_DIR)/.config.nopkg; done
-	@$(COMMON_CONFIG_ENV) \
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y \
 		KCONFIG_ALLCONFIG=$(CONFIG_DIR)/.config.nopkg \
 		$< --allyesconfig $(CONFIG_CONFIG_IN)
 	@rm -f $(CONFIG_DIR)/.config.nopkg
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 allnopackageconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	@grep -v BR2_PACKAGE_ $(BR2_CONFIG) > $(CONFIG_DIR)/.config.nopkg
-	@$(COMMON_CONFIG_ENV) \
+	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y \
 		KCONFIG_ALLCONFIG=$(CONFIG_DIR)/.config.nopkg \
 		$< --allnoconfig $(CONFIG_CONFIG_IN)
 	@rm -f $(CONFIG_DIR)/.config.nopkg
+	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 
 silentoldconfig: $(BUILD_DIR)/buildroot-config/conf outputmakefile
 	$(COMMON_CONFIG_ENV) $< --silentoldconfig $(CONFIG_CONFIG_IN)
@@ -826,7 +853,7 @@ printvars:
 clean:
 	rm -rf $(TARGET_DIR) $(BINARIES_DIR) $(HOST_DIR) \
 		$(BUILD_DIR) $(BASE_DIR)/staging \
-		$(LEGAL_INFO_DIR)
+		$(LEGAL_INFO_DIR) $(GRAPHS_DIR)
 
 distclean: clean
 ifeq ($(DL_DIR),$(TOPDIR)/dl)
@@ -864,6 +891,19 @@ help:
 	@echo '  randpackageconfig      - New config with random answer to package options'
 	@echo '  allyespackageconfig    - New config where pkg options are accepted with yes'
 	@echo '  allnopackageconfig     - New config where package options are answered with no'
+	@echo
+	@echo 'Package-specific:'
+	@echo '  <pkg>                  - Build and install <pkg> and all its dependencies'
+	@echo '  <pkg>-source           - Only download the source files for <pkg>'
+	@echo '  <pkg>-extract          - Extract <pkg> sources'
+	@echo '  <pkg>-patch            - Apply patches to <pkg>'
+	@echo '  <pkg>-depends          - Build <pkg>'\''s dependencies'
+	@echo '  <pkg>-configure        - Build <pkg> up to the configure step'
+	@echo '  <pkg>-build            - Build <pkg> up to the build step'
+	@echo '  <pkg>-graph-depends    - Generate a graph of <pkg>'\''s dependencies'
+	@echo '  <pkg>-dirclean         - Remove <pkg> build directory'
+	@echo '  <pkg>-reconfigure      - Restart the build from the configure step'
+	@echo '  <pkg>-rebuild          - Restart the build from the build step'
 ifeq ($(BR2_PACKAGE_BUSYBOX),y)
 	@echo '  busybox-menuconfig     - Run BusyBox menuconfig'
 endif
@@ -902,6 +942,11 @@ endif
 	@echo '  make V=0|1             - 0 => quiet build (default), 1 => verbose build'
 	@echo '  make O=dir             - Locate all output files in "dir", including .config'
 	@echo
+	@echo 'For further details, see README, generate the Buildroot manual, or consult'
+	@echo 'it on-line at http://buildroot.org/docs.html'
+	@echo
+
+list-defconfigs:
 	@echo 'Built-in configs:'
 	@$(foreach b, $(sort $(notdir $(wildcard $(TOPDIR)/configs/*_defconfig))), \
 	  printf "  %-35s - Build for %s\\n" $(b) $(b:_defconfig=);)
@@ -911,6 +956,7 @@ ifneq ($(wildcard $(BR2_EXTERNAL)/configs/*_defconfig),)
 	@$(foreach b, $(sort $(notdir $(wildcard $(BR2_EXTERNAL)/configs/*_defconfig))), \
 	  printf "  %-35s - Build for %s\\n" $(b) $(b:_defconfig=);)
 endif
+	@echo
 
 release: OUT = buildroot-$(BR2_VERSION)
 
