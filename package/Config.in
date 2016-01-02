@@ -4,8 +4,6 @@ menu "Target packages"
 	source "package/busybox/Config.in"
 
 menu "Compressors and decompressors"
-	source "package/lz4/Config.in"
-	source "package/lzop/Config.in"
 	source "package/xz/Config.in"
 endmenu
 
@@ -26,7 +24,6 @@ endif
 endmenu
 
 menu "Filesystem and flash utilities"
-	source "package/btrfs-progs/Config.in"
 	source "package/e2fsprogs/Config.in"
 	source "package/squashfs/Config.in"
 	source "package/xfsprogs/Config.in"
@@ -47,7 +44,6 @@ endmenu
 menu "Libraries"
 
 menu "Compression and decompression"
-	source "package/lzo/Config.in"
 	source "package/zlib/Config.in"
 endmenu
 
@@ -59,6 +55,12 @@ menu "Security"
 	source "package/libselinux/Config.in"
 	source "package/libsemanage/Config.in"
 	source "package/libsepol/Config.in"
+endmenu
+
+menu "Text and terminal handling"
+	source "package/ncurses/Config.in"
+	source "package/popt/Config.in"
+	source "package/readline/Config.in"
 endmenu
 
 endmenu
@@ -84,6 +86,7 @@ if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
 	source "package/coreutils/Config.in"
 endif
 	source "package/kmaps/Config.in"
+	source "package/kmod/Config.in"
 	source "package/pkgsrc/Config.in"
 if BR2_PACKAGE_BUSYBOX_SHOW_OTHERS
 	source "package/procps-ng/Config.in"
