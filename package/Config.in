@@ -29,7 +29,6 @@ menu "Filesystem and flash utilities"
 	source "package/btrfs-progs/Config.in"
 	source "package/e2fsprogs/Config.in"
 	source "package/squashfs/Config.in"
-	source "package/unionfs/Config.in"
 	source "package/xfsprogs/Config.in"
 endmenu
 
@@ -50,10 +49,6 @@ menu "Libraries"
 menu "Compression and decompression"
 	source "package/lzo/Config.in"
 	source "package/zlib/Config.in"
-endmenu
-
-menu "Filesystem"
-	source "package/libfuse/Config.in"
 endmenu
 
 menu "Other"
