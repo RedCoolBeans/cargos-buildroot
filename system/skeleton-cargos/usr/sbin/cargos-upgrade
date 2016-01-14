@@ -66,6 +66,11 @@ cmd_exe() {
 	fi
 }
 
+# CargOS upgrade 2015.11 -> 2016.01
+upgrade_201511_to_201601() {
+	upgrade_20157_to_20158
+}
+
 # CargOS upgrade 2015.10 -> 2015.11
 upgrade_201510_to_201511() {
 	upgrade_20157_to_20158
