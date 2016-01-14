@@ -20,5 +20,13 @@ endef
 
 READLINE_POST_INSTALL_TARGET_HOOKS += READLINE_PURGE_EXAMPLES
 
+ifneq ($(BR2_STATIC_LIBS),y)
+# libraries get installed read only, so strip fails
+define READLINE_INSTALL_FIXUPS_SHARED
+	chmod +w $(addprefix $(TARGET_DIR)/usr/lib/,libhistory.so.* libreadline.so.*)
+endef
+READLINE_POST_INSTALL_TARGET_HOOKS += READLINE_INSTALL_FIXUPS_SHARED
+endif
+
 $(eval $(autotools-package))
 $(eval $(host-autotools-package))
