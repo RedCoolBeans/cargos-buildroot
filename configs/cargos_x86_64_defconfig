@@ -16,6 +16,7 @@ BR2_TARGET_LOCALTIME="Europe/Berlin"
 BR2_ROOTFS_POST_IMAGE_SCRIPT="support/scripts/cargos-iso.sh"
 BR2_LINUX_KERNEL=y
 BR2_LINUX_KERNEL_SAME_AS_HEADERS=y
+BR2_LINUX_KERNEL_PATCH="http://dev.alpinelinux.org/~tteras/grsec/pax-linux-4.1.15-test24-alpine.patch http://dev.alpinelinux.org/~tteras/grsec/grsec-4.1.15-3.1-201509112213-alpine.patch"
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="board/cargos/x86/linux-4.0.config"
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
