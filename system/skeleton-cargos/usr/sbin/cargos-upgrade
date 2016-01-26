@@ -66,6 +66,29 @@ cmd_exe() {
 	fi
 }
 
+# CargOS upgrade 2016.01 -> 2016.02
+upgrade_201601_to_201602() {
+	clear
+	PKG_PATH=http://download.cargos.io/$(cat /etc/cargos-release)/$(uname -m)/packages/All
+	/usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug
+	rm -rf /usr/pkg/var/chroot/sshd && mkdir -p /usr/pkg/var/chroot/sshd
+	for p in $(/usr/pkg/sbin/pkg_info | cut -d ' ' -f1 | sed 's/.[^-]*$//')
+	do
+		PKG_PATH=${PKG_PATH} /usr/pkg/sbin/pkg_add -U $p
+	done
+	source /etc/profile && /usr/pkg/bin/pkgin -y up && /usr/pkg/bin/pkgin -y fug && \
+		/usr/pkg/bin/pkgin -f up
+	/bin/sync
+	_message="
+	The upgrade requires a reboot. Do you want to reboot now?
+	"
+	dialog --backtitle "${TITLE_PREFIX}" \
+		--title "CargOS Upgrade Utility" \
+		--yesno "${_message}" 7 80
+	[ $? -gt 0 ] && exit 0
+	/sbin/reboot
+}
+
 # CargOS upgrade 2015.11 -> 2016.01
 upgrade_201511_to_201601() {
 	upgrade_20157_to_20158
