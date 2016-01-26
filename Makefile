@@ -41,7 +41,7 @@ else # umask
 all:
 
 # Set and export the version string
-export BR2_VERSION := 2016.01
+export BR2_VERSION := 2016.02
 
 # Save running make version since it's clobbered by the make package
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
@@ -598,8 +598,8 @@ define CARGOS_FIXUP
 	# Copy for persistent storage
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
-	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
-		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)
+	cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
+		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)-grsec
 	rm -f $(TARGET_DIR)/System.map
 endef
 TARGET_REFINALIZE_HOOKS += CARGOS_FIXUP
