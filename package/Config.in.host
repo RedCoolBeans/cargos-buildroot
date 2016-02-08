@@ -1,6 +1,5 @@
 menu "Host utilities"
 
-	source "package/checkpolicy/Config.in.host"
 	source "package/e2fsprogs/Config.in.host"
 	source "package/squashfs/Config.in.host"
 	source "package/util-linux/Config.in.host"

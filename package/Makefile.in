@@ -391,8 +391,6 @@ endif
 
 include package/pkg-download.mk
 include package/pkg-autotools.mk
-include package/pkg-cmake.mk
-include package/pkg-luarocks.mk
 include package/pkg-perl.mk
 include package/pkg-python.mk
 include package/pkg-virtual.mk

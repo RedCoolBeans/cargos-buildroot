@@ -25,7 +25,7 @@ PROCPS_NG_DEPENDENCIES += busybox
 # this if the /usr/bin and /bin directories are not merged.
 ifeq ($(BR2_ROOTFS_MERGED_USR),)
 define PROCPS_NG_MOVE_BINARIES
-	for i in pidof watch; do \
+	-for i in pidof watch; do \
 		mv $(TARGET_DIR)/usr/bin/$$i $(TARGET_DIR)/bin/; \
 	done
 endef
