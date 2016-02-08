@@ -11,5 +11,3 @@ endif
 TOOLCHAIN_ADD_TOOLCHAIN_DEPENDENCY = NO
 
 $(eval $(virtual-package))
-
-toolchain: $(HOST_DIR)/usr/share/buildroot/toolchainfile.cmake
