@@ -606,11 +606,26 @@ define CARGOS_FIXUP
 	# Copy for persistent storage
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
-	cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
+	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
 		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)-grsec
 	rm -f $(TARGET_DIR)/System.map
 endef
+
+define PARCEL_FIXUP
+	rm -rf $(TARGET_DIR)/usr/include/
+	rm -rf $(TARGET_DIR)/etc/ld.so*
+	rm -rf $(TARGET_DIR)/var/db/Makefile
+	rm -rf $(TARGET_DIR)/.etc
+	rm -rf $(TARGET_DIR)/usr/share/doc/*
+	rm -rf $(TARGET_DIR)/usr/share/i18n/*
+	rm -rf $(TARGET_DIR)/usr/lib/gconv
+endef
+
+ifneq ($(BR2_TARGET_ROOTFS_DOCKER_NAME),"parcel")
 TARGET_REFINALIZE_HOOKS += CARGOS_FIXUP
+else
+TARGET_REFINALIZE_HOOKS += PARCEL_FIXUP
+endif
 
 $(TARGETS_ROOTFS): target-finalize
 
