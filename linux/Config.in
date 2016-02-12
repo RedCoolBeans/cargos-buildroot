@@ -29,18 +29,6 @@ choice
 config BR2_LINUX_KERNEL_LATEST_VERSION
 	bool "4.1.17"
 
-config BR2_LINUX_KERNEL_SAME_AS_HEADERS
-	bool "Same as toolchain kernel headers"
-	depends on !BR2_KERNEL_HEADERS_AS_KERNEL
-	depends on BR2_TOOLCHAIN_BUILDROOT
-	help
-	  This option will re-use the same kernel sources as the one
-	  that have been used for the kernel headers of the
-	  cross-compiling toolchain. Having the same version for the
-	  kernel running on the system and for the kernel headers is
-	  not a requirement, but using the same version allows to
-	  download only one tarball of the kernel sources.
-
 config BR2_LINUX_KERNEL_CUSTOM_VERSION
 	bool "Custom version"
 	help
@@ -189,8 +177,9 @@ choice
 config BR2_LINUX_KERNEL_UIMAGE
 	bool "uImage"
 	depends on BR2_arc || BR2_arm || BR2_armeb || BR2_bfin || \
-		   BR2_powerpc || BR2_sh || BR2_sh64 || \
-		   BR2_mips || BR2_mipsel || BR2_mips64 || BR2_mips64el
+		   BR2_powerpc || BR2_powerpc64 || BR2_powerpc64le || \
+		   BR2_sh || BR2_sh64 || BR2_mips || BR2_mipsel || \
+		   BR2_mips64 || BR2_mips64el
 	select BR2_LINUX_KERNEL_UBOOT_IMAGE
 
 config BR2_LINUX_KERNEL_APPENDED_UIMAGE
@@ -209,6 +198,10 @@ config BR2_LINUX_KERNEL_ZIMAGE
 	depends on BR2_arm || BR2_armeb || BR2_powerpc || \
 		   BR2_powerpc64 || BR2_powerpc64le || BR2_sparc || \
 		   BR2_sh || BR2_sh64 || BR2_xtensa
+
+config BR2_LINUX_KERNEL_ZIMAGE_EPAPR
+	bool "zImage.epapr"
+	depends on BR2_powerpc64 || BR2_powerpc64le
 
 config BR2_LINUX_KERNEL_APPENDED_ZIMAGE
 	bool "zImage with appended DT"
