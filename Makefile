@@ -609,6 +609,8 @@ define CARGOS_FIXUP
 	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
 		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)-grsec
 	rm -f $(TARGET_DIR)/System.map
+	find $(TARGET_DIR) -name "*.a" -exec rm {} \;
+	rm -rf $(TARGET_DIR)/sbin/sln
 endef
 
 define PARCEL_FIXUP
@@ -619,6 +621,8 @@ define PARCEL_FIXUP
 	rm -rf $(TARGET_DIR)/usr/share/doc/*
 	rm -rf $(TARGET_DIR)/usr/share/i18n/*
 	rm -rf $(TARGET_DIR)/usr/lib/gconv
+	find $(TARGET_DIR) -name "*.a" -exec rm {} \;
+	rm -rf $(TARGET_DIR)/sbin/sln
 endef
 
 ifneq ($(BR2_TARGET_ROOTFS_DOCKER_NAME),"parcel")
