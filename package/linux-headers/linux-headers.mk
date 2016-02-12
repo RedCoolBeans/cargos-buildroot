@@ -60,7 +60,10 @@ define LINUX_HEADERS_CONFIGURE_CMDS
 			HOSTCFLAGS="$(HOSTCFLAGS)" \
 			HOSTCXX="$(HOSTCXX)" \
 			INSTALL_HDR_PATH=$(@D)/usr \
-			headers_install)
+			DISABLE_PAX_PLUGINS=y \
+			defconfig prepare \
+			headers_install; \
+		rm -f .config)
 endef
 
 define LINUX_HEADERS_INSTALL_STAGING_CMDS
@@ -71,6 +74,7 @@ define LINUX_HEADERS_INSTALL_STAGING_CMDS
 			HOSTCFLAGS="$(HOSTCFLAGS)" \
 			HOSTCXX="$(HOSTCXX)" \
 			INSTALL_HDR_PATH=$(STAGING_DIR)/usr \
+			DISABLE_PAX_PLUGINS=y \
 			headers_install)
 endef
 
