@@ -17,6 +17,7 @@ most of which are normally already installed:
 - qemu-img
 - unzip
 - wget
+- which
 
 Depending on the platform you're building for you'll need these additional
 dependencies:
