@@ -1,3 +1,2 @@
 # Locally calculated after checking pgp signature
-sha256	b9b06f8afc52b18eb956b74a0d9b58db8bb26ac109a780a9b5623d8d6779672a	bootstrap-cargos-2016.02-x86_64.tar.gz
-sha256	ce96f256257520870c14b48028a17cdc976a6b9cf98a308551fd5c498e9a330b	bootstrap-cargos-2016.01-rpi2.tar.gz
+sha256	9e649f9cd0874c8804217f3336ee9c8d36703441040f9fb0b288a4485975bfe2	bootstrap-cargos-2016.03-x86_64.tar.gz

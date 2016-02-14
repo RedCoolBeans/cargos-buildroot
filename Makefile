@@ -41,7 +41,7 @@ else # umask
 all:
 
 # Set and export the version string
-export BR2_VERSION := 2016.02
+export BR2_VERSION := 2016.03
 
 # Save running make version since it's clobbered by the make package
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
@@ -609,8 +609,6 @@ define CARGOS_FIXUP
 	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
 		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)-grsec
 	rm -f $(TARGET_DIR)/System.map
-	find $(TARGET_DIR) -name "*.a" -exec rm {} \;
-	rm -rf $(TARGET_DIR)/sbin/sln
 endef
 
 define PARCEL_FIXUP
