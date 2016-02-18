@@ -68,7 +68,7 @@ cmd_exe() {
 
 # CargOS upgrade 2016.02 -> 2016.03
 upgrade_201602_to_201603() {
-	upgrade_201601_to_201602()
+	upgrade_201601_to_201602
 }
 
 # CargOS upgrade 2016.01 -> 2016.02
