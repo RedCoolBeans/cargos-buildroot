@@ -42,10 +42,10 @@ rc_preprocess()
 	if [ ! -e /dev/cargos/etc ]; then
 		/etc/rc.bootstrap
 	else
-		mount /dev/cargos/etc /cargos
-		mount /dev/cargos/pkg /usr/pkg
-		mount /dev/cargos/root /root
-		mount /dev/cargos/home /home
+		mount -o nodev,nosuid /dev/cargos/etc /cargos
+		mount -o nodev /dev/cargos/pkg /usr/pkg
+		mount -o nodev,nosuid /dev/cargos/root /root
+		mount -o nodev,nosuid /dev/cargos/home /home
 		mount /dev/cargos/docker /var/lib/docker
 		mount -t overlay overlay -olowerdir=/.etc,upperdir=/cargos/etc,workdir=/cargos/etc-work /etc
 	fi
