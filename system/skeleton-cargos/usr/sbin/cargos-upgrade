@@ -24,12 +24,13 @@ export TERM=xterm-color
 
 usage() {
 	echo
-	echo "Usage: ${0##*/} [-cfnu]" >&2
+	echo "Usage: ${0##*/} [-cfnsu]" >&2
 	echo
 	echo "Options:"
 	echo "  -c    check if the base system needs upgrading with -u"
 	echo "  -f    force installation to the disk(s)"
 	echo "  -n    dry-run mode, only report what would be done"
+	echo "  -s    run some security related checks on the system"
 	echo "  -u    run upgrade steps required for the current release"
 	echo
 	exit 1
@@ -177,11 +178,24 @@ cargos_upgrade() {
 	exit 0
 }
 
-while getopts 'cfnu' arg; do
+cargos_seccheck() {
+	_weak=$(grep -Ev ':(\$|\*|\!)' /etc/shadow | cut -d':' -f1);
+	if [ -n "${_weak}" ]; then 
+		echo "!!! The following user(s) use a weak hash."
+		echo "!!! Please update their password with passwd."
+		echo "!!!"
+		echo -n "!!! "
+		echo ${_weak} 
+	fi
+	exit 0
+}
+
+while getopts 'cfnsu' arg; do
 	case ${arg} in
 	c)	check=1 ;;
 	n)	dryrun=" (dry run)" ;;
 	f)	force=1 ;;
+	s)	seccheck=1 ;;
 	u)	upgrade=1 ;;
 	*)	usage ;;
 	esac
@@ -194,6 +208,7 @@ fi
 
 echo $$ >${_PID}
 
+[ -z ${seccheck} ] || cargos_seccheck
 [ -z ${check} ] || cargos_check_upgrade
 [ -z ${upgrade} ] || cargos_upgrade
 
