@@ -717,7 +717,7 @@ EOF
 	((_c_cnt++))
 	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y up"
 	((_c_cnt++))
-	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2"
+	_cmds[$_c_cnt]="/usr/pkg/bin/pkgin -y in wget grub2 paxctl"
 	((_c_cnt++))
 	_cmds[$_c_cnt]="/usr/pkg/bin/wget -T5 -t5 -O /tmp/rootfs.squashfs-noinst-${_version} ${_cargos_mirror}/${_version}/${_arch}/rootfs.squashfs-noinst-${_version}"
 	((_c_cnt++))
@@ -727,7 +727,11 @@ EOF
 		((_c_cnt++))
 		_cmds[$_c_cnt]="mount -t ext4 ${_disk}1 /boot"
 		((_c_cnt++))
+		_cmds[$_c_cnt]="/usr/pkg/sbin/paxctl -czpms /usr/pkg/sbin/grub-{probe,bios-setup}"
+		((_c_cnt++))
 		_cmds[$_c_cnt]="/usr/pkg/sbin/grub-install -f ${_disk}"
+		((_c_cnt++))
+		_cmds[$_c_cnt]="/usr/pkg/sbin/paxctl -cz /usr/pkg/sbin/grub-{probe,bios-setup}"
 		((_c_cnt++))
 		_cmds[$_c_cnt]="cp /tmp/grub.cfg /boot/grub/grub.cfg"
 		((_c_cnt++))

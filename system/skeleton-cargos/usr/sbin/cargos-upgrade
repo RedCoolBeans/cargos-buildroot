@@ -199,6 +199,7 @@ echo $$ >${_PID}
 
 _wget=$(which wget) || _wget="/usr/pkg/bin/wget"
 _grub_install=$(which grub-install) || _grub_install="/usr/pkg/sbin/grub-install"
+_paxctl=$(which paxctl) || _paxctl="/usr/pkg/sbin/paxctl"
 
 if [ ! -e ${_wget} ]; then
 	pr_error "${0##*/} needs wget to be installed, please issue 'pkgin in wget' to install."
@@ -206,6 +207,10 @@ fi
 
 if [ ! -e ${_grub_install} ]; then
 	pr_error "${0##*/} needs grub2 to be installed: please issue 'pkgin in grub2' to install."
+else
+	if [ ! -e ${_paxctl} ]; then
+		pr_error "${0##*/} needs paxctl to be installed: please issue 'pkgin in paxctl' to install."
+	fi
 fi
 
 _rver=$(${_wget} -qO - http://download.cargos.io/current)
@@ -278,7 +283,7 @@ for i in $(pvs --noheadings | awk '{print $1}'); do
 	cmd_exe fsck.ext4 -p ${_disk}1 >/dev/null
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 	cmd_exe mount -t ext4 ${_disk}1 /boot
-	[ -z "${dryrun}" ] && [ -z "${force}" ] && if [ ! -e /boot/grub/grub2.cfg ]; then
+	[ -z "${dryrun}" ] && [ -z "${force}" ] && if [ ! -e /boot/grub/grub.cfg ]; then
 		cmd_exe umount /boot
 		dialog --backtitle "${TITLE_PREFIX}" \
 			--title "CargOS Upgrade Utility" \
@@ -288,7 +293,9 @@ for i in $(pvs --noheadings | awk '{print $1}'); do
 	fi
 	echo
 	echo -n "* Installing grub boot loader to ${_disk} ... "
+	cmd_exe /usr/pkg/sbin/paxctl -czpms /usr/pkg/sbin/grub-{probe,bios-setup} 2>/dev/null
 	cmd_exe /usr/pkg/sbin/grub-install -f ${_disk} 2>/dev/null
+	cmd_exe /usr/pkg/sbin/paxctl -cz /usr/pkg/sbin/grub-{probe,bios-setup} 2>/dev/null
 	[ $? -eq 0 ] && echo 'done.' || pr_error 'FAILED'
 	cmd_exe cp /tmp/grub.cfg /boot/grub/grub.cfg
 	for _version in ${_rver} ${_cver}; do
