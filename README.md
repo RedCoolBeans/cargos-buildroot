@@ -27,13 +27,8 @@ dependencies:
 - squashfs-tools
 - xorriso
 
-`rpi2` (Raspberry Pi 2)
-
-- dosfstools
-- kpartx
-
 Then proceed to build CargOS, replace ${platform} with the platform you're
-building for (`x86_64` or `rpi2`)
+building for, e.g. `x86_64`:
 
 1. run `make cargos_${platform}_defconfig`
 2. run `make`
@@ -43,5 +38,6 @@ building for (`x86_64` or `rpi2`)
 
 ### Caveats
 
-- Support for Raspberry Pi 2 is currently under development and therefore not
-  officially supported (yet).
+- Development on support Raspberry Pi 2 has stalled. Some code is available in
+  this repository, but isn't kept up to date. The installer is the next component
+  that needs work.
