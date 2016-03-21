@@ -13,6 +13,7 @@ BINUTILS_VERSION = arc-2015.12
 else
 BINUTILS_VERSION = 2.25.1
 endif
+endif # BINUTILS_VERSION
 
 ifeq ($(BR2_arc),y)
 BINUTILS_SITE = $(call github,foss-for-synopsys-dwc-arc-processors,binutils-gdb,$(BINUTILS_VERSION))
