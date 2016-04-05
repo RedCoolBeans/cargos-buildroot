@@ -40,6 +40,8 @@ EOF
 		mv cargos${_rel}${_c}-${_version}.iso release/${_version}/iso
 		mv cargos${_rel}${_c}-${_version}.qcow2 release/${_version}/qcow2
 
+		(cd release/${_version}/iso && ln -sf cargos${_rel}${_c}-${_version}.iso cargos${_rel}${_c}.iso)
+
 		rsync -qv ${CD}/bzImage release/${_version}/bzImage-${_version}
 		rsync -qv ${CD}/rootfs.squashfs${_rel} release/${_version}/rootfs.squashfs${_rel}-${_version}
 	done
