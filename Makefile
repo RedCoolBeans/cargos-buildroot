@@ -604,6 +604,7 @@ TARGET_FINALIZE_HOOKS += PURGE_LOCALES
 endif
 
 define CARGOS_FIXUP
+	-cp -pR $(HOST_DIR)/usr/x86_64-cargos-linux-musl/sysroot/lib/{crt1,crti,crtn}.o $(TARGET_DIR)/lib
 	cp -pR $(HOST_DIR)/usr/$(GNU_TARGET_NAME)/sysroot/usr/include/* $(TARGET_DIR)/usr/include/
 	find $(TARGET_DIR)/usr/include -name ..install.cmd -exec rm {} \;
 	rm -rf $(TARGET_DIR)/etc/ld.so*
@@ -612,7 +613,7 @@ define CARGOS_FIXUP
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
 	-cp $(BUILD_DIR)/linux-$(LINUX_VERSION)/System.map $(TARGET_DIR) && \
-		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)
+		/usr/bin/sudo /usr/sbin/chroot $(TARGET_DIR) depmod -F /System.map -a $(LINUX_VERSION)-grsec
 	rm -f $(TARGET_DIR)/System.map
 endef
 

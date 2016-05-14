@@ -1,0 +1,18 @@
+--- a/hash.c.orig	2016-05-08 13:19:08.247869736 +0200
++++ b/hash.c	2016-05-08 13:19:25.379869506 +0200
+@@ -72,7 +72,6 @@
+ #ifdef MAKE_BOOTSTRAP
+ static char rcsid[] = "$NetBSD: hash.c,v 1.5 2007/03/03 00:09:30 simonb Exp $";
+ #else
+-#include <sys/cdefs.h>
+ #endif
+ 
+ #include <sys/types.h>
+--- a/linux.c.orig	2016-05-08 13:19:11.083869698 +0200
++++ b/linux.c	2016-05-08 13:19:17.707869609 +0200
+@@ -1,5 +1,4 @@
+ #include <sys/types.h>
+-#include <sys/cdefs.h>
+ 
+ #include <errno.h>
+ #include <errno.h>

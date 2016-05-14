@@ -1047,7 +1047,7 @@ while [ /usr/bin/true ]; do
 		create_persistent
 		create_network_config
 		while true ; do change_root_password && break ; done
-		set_timezone
+		#set_timezone
 		save_kmap
 		prompt_localboot && do_localboot yes || :
 	fi
