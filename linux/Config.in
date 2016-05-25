@@ -27,7 +27,7 @@ choice
 	prompt "Kernel version"
 
 config BR2_LINUX_KERNEL_LATEST_VERSION
-	bool "4.4.10"
+	bool "4.4.11"
 
 config BR2_LINUX_KERNEL_CUSTOM_VERSION
 	bool "Custom version"
