@@ -100,6 +100,10 @@ comment 'systemd needs an (e)glibc toolchain, headers >= 3.7'
 
 config BR2_INIT_NONE
 	bool "None"
+	help
+	  Buildroot will not install any init system. You will
+	  have to provide your own, either with a new package
+	  or with a rootfs-overlay.
 
 endchoice
 
