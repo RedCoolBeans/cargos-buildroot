@@ -57,7 +57,13 @@ $(2)_DEPENDENCIES ?= $$(filter-out host-skeleton host-toolchain $(1),\
 endif
 
 # Add dependency against the provider
+# For a host package, there is no corresponding BR2_PACKAGE_PROVIDES_HOST_FOO,
+# so we need to compute it from the target variant.
+ifeq ($(4),target)
 $(2)_DEPENDENCIES += $$(call qstrip,$$(BR2_PACKAGE_PROVIDES_$(2)))
+else
+$(2)_DEPENDENCIES += host-$$(call qstrip,$$(BR2_PACKAGE_PROVIDES_$(3)))
+endif
 
 # Call the generic package infrastructure to generate the necessary
 # make targets
