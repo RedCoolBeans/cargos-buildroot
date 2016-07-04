@@ -217,6 +217,25 @@ $(BUILD_DIR)/%/.stamp_host_installed:
 	$(Q)touch $@
 
 # Install to staging dir
+#
+# Some packages install libtool .la files alongside any installed
+# libraries. These .la files sometimes refer to paths relative to the
+# sysroot, which libtool will interpret as absolute paths to host
+# libraries instead of the target libraries. Since this is not what we
+# want, these paths are fixed by prefixing them with $(STAGING_DIR).
+# As we configure with --prefix=/usr, this fix needs to be applied to
+# any path that starts with /usr.
+#
+# To protect against the case that the output or staging directories or
+# the pre-installed external toolchain themselves are under /usr, we first
+# substitute away any occurrences of these directories with @BASE_DIR@,
+# @STAGING_DIR@ and @TOOLCHAIN_EXTERNAL_INSTALL_DIR@ respectively.
+#
+# Note that STAGING_DIR can be outside BASE_DIR when the user sets
+# BR2_HOST_DIR to a custom value. Note that TOOLCHAIN_EXTERNAL_INSTALL_DIR
+# can be under @BASE_DIR@ when it's a downloaded toolchain, and can be
+# empty when we use an internal toolchain.
+#
 $(BUILD_DIR)/%/.stamp_staging_installed:
 	@$(call step_start,install-staging)
 	@$(call MESSAGE,"Installing to staging directory")
@@ -367,8 +386,6 @@ ifndef $(2)_VERSION
   $(2)_DL_VERSION := $$($(3)_DL_VERSION)
  else ifdef $(3)_VERSION
   $(2)_DL_VERSION := $$($(3)_VERSION)
- else
-  $(2)_DL_VERSION = undefined
  endif
 else
  $(2)_DL_VERSION := $$(strip $$($(2)_VERSION))
@@ -379,7 +396,8 @@ ifdef $(3)_OVERRIDE_SRCDIR
   $(2)_OVERRIDE_SRCDIR ?= $$($(3)_OVERRIDE_SRCDIR)
 endif
 
-$(2)_BASE_NAME	=  $(1)-$$($(2)_VERSION)
+$(2)_BASE_NAME	= $$(if $$($(2)_VERSION),$(1)-$$($(2)_VERSION),$(1))
+$(2)_RAW_BASE_NAME = $$(if $$($(2)_VERSION),$$($(2)_RAWNAME)-$$($(2)_VERSION),$$($(2)_RAWNAME))
 $(2)_DL_DIR	=  $$(DL_DIR)/$$($(2)_BASE_NAME)
 $(2)_DIR	=  $$(BUILD_DIR)/$$($(2)_BASE_NAME)
 
@@ -409,8 +427,8 @@ endif
 ifndef $(2)_SOURCE
  ifdef $(3)_SOURCE
   $(2)_SOURCE = $$($(3)_SOURCE)
- else
-  $(2)_SOURCE			?= $$($(2)_RAWNAME)-$$($(2)_VERSION).tar.gz
+ else ifdef $(2)_VERSION
+  $(2)_SOURCE			?= $$($(2)_RAW_BASE_NAME).tar.gz
  endif
 endif
 
@@ -484,15 +502,13 @@ endif
 
 $(2)_REDISTRIBUTE		?= YES
 
+$(2)_REDIST_SOURCES_DIR = $$(REDIST_SOURCES_DIR_$$(call UPPERCASE,$(4)))/$$($(2)_RAW_BASE_NAME)
+
 # When a target package is a toolchain dependency set this variable to
 # 'NO' so the 'toolchain' dependency is not added to prevent a circular
 # dependency
 $(2)_ADD_TOOLCHAIN_DEPENDENCY	?= YES
 
-ifeq ($(4),host)
-$(2)_DEPENDENCIES ?= $$(filter-out host-skeleton host-toolchain $(1),\
-	$$(patsubst host-host-%,host-%,$$(addprefix host-,$$($(3)_DEPENDENCIES))))
-endif
 ifeq ($(4),target)
 ifneq ($(1),skeleton)
 $(2)_DEPENDENCIES += skeleton
@@ -682,11 +698,13 @@ $(1)-show-depends:
 			@echo $$($(2)_FINAL_ALL_DEPENDENCIES)
 
 $(1)-graph-depends: graph-depends-requirements
-			@$$(INSTALL) -d $$(O)/graphs
+			@$$(INSTALL) -d $$(GRAPHS_DIR)
 			@cd "$$(CONFIG_DIR)"; \
-			$$(TOPDIR)/support/scripts/graph-depends -p $(1) $$(BR2_GRAPH_DEPS_OPTS) \
-			|tee $$(O)/graphs/$$(@).dot \
-			|dot $$(BR2_GRAPH_DOT_OPTS) -T$$(BR_GRAPH_OUT) -o $$(O)/graphs/$$(@).$$(BR_GRAPH_OUT)
+			$$(TOPDIR)/support/scripts/graph-depends $$(BR2_GRAPH_DEPS_OPTS) \
+				-p $(1) -o $$(GRAPHS_DIR)/$$(@).dot
+			dot $$(BR2_GRAPH_DOT_OPTS) -T$$(BR_GRAPH_OUT) \
+				-o $$(GRAPHS_DIR)/$$(@).$$(BR_GRAPH_OUT) \
+				$$(GRAPHS_DIR)/$$(@).dot
 
 $(1)-all-source:	$(1)-source
 $(1)-all-source:	$$(foreach p,$$($(2)_FINAL_ALL_DEPENDENCIES),$$(p)-all-source)
@@ -919,6 +937,12 @@ endif
 	$(1)-show-version \
 	$(1)-source \
 	$(1)-source-check
+
+ifneq ($$($(2)_SOURCE),)
+ifeq ($$($(2)_SITE),)
+$$(error $(2)_SITE cannot be empty when $(2)_SOURCE is not)
+endif
+endif
 
 ifeq ($$(patsubst %/,ERROR,$$($(2)_SITE)),ERROR)
 $$(error $(2)_SITE ($$($(2)_SITE)) cannot have a trailing slash)
