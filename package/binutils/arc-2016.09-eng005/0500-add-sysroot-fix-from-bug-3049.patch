@@ -1,13 +1,25 @@
-Signed-off-by: Sven Rebhan <odinshorse@googlemail.com>
+From 30628870e583375f8927c04398c7219c6e9f703c Mon Sep 17 00:00:00 2001
+From: Romain Naour <romain.naour@gmail.com>
+Date: Fri, 25 Dec 2015 11:42:48 +0100
+Subject: [PATCH] add sysroot fix from bug #3049
 
 Always try to prepend the sysroot prefix to absolute filenames first.
 
 http://bugs.gentoo.org/275666
 http://sourceware.org/bugzilla/show_bug.cgi?id=10340
 
+Signed-off-by: Sven Rebhan <odinshorse@googlemail.com>
+[Romain: rebase on top of 2.26]
+Signed-off-by: Romain Naour <romain.naour@gmail.com>
+---
+ ld/ldfile.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/ld/ldfile.c b/ld/ldfile.c
+index 96f9ecc..1439309 100644
 --- a/ld/ldfile.c
 +++ b/ld/ldfile.c
-@@ -308,18 +308,25 @@
+@@ -335,18 +335,25 @@ ldfile_open_file_search (const char *arch,
       directory first.  */
    if (! entry->flags.maybe_archive)
      {
@@ -35,3 +47,6 @@ http://sourceware.org/bugzilla/show_bug.cgi?id=10340
  	return TRUE;
  
        if (IS_ABSOLUTE_PATH (entry->filename))
+-- 
+2.4.3
+
