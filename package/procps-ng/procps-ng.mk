@@ -43,4 +43,7 @@ PROCPS_NG_CONF_OPTS += \
 	--enable-watch8bit
 endif
 
+# disable the colorful shitshow
+PROCPS_NG_CONF_OPTS += --disable-modern-top
+
 $(eval $(autotools-package))
