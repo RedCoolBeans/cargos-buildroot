@@ -13,6 +13,7 @@ endmenu
 
 menu "Development tools"
 	source "package/binutils/Config.in"
+	source "package/flex/Config.in"
 	source "package/egcc/Config.in"
 	source "package/gawk/Config.in"
 	source "package/gperf/Config.in"
@@ -60,6 +61,7 @@ endmenu
 
 menu "Networking applications"
 	source "package/iptables/Config.in"
+	source "package/iproute2/Config.in"
 endmenu
 
 menu "Shell and utilities"
