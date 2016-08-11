@@ -15,4 +15,5 @@ BR2_ROOTFS_DEVICE_TABLE="system/device_table_parcel.txt"
 BR2_ROOTFS_SKELETON_CUSTOM=y
 BR2_ROOTFS_SKELETON_CUSTOM_PATH="system/skeleton-parcel"
 BR2_PACKAGE_BUSYBOX_CONFIG="package/busybox/busybox-parcel.config"
+BR2_PACKAGE_CA_CERTIFICATES=y
 BR2_TARGET_ROOTFS_DOCKER=y

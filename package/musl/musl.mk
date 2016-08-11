@@ -57,6 +57,10 @@ define MUSL_INSTALL_TARGET_CMDS
 	$(TARGET_MAKE_ENV) $(MAKE) -C $(@D) \
 		DESTDIR=$(TARGET_DIR) install-libs
 	$(RM) $(addprefix $(TARGET_DIR)/lib/,crt1.o crtn.o crti.o Scrt1.o)
+	# provide minimal libssp_nonshared.a so we don't need libssp from gcc
+	$(TARGET_CC) $(TARGET_CFLAGS) -c package/musl/__stack_chk_fail_local.c -o \
+		$(@D)/__stack_chk_fail_local.o 
+	$(TARGET_AR) r $(TARGET_DIR)/usr/lib/libssp_nonshared.a $(@D)/__stack_chk_fail_local.o || return 1
 endef
 
 $(eval $(generic-package))

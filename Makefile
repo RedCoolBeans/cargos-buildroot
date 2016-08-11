@@ -41,7 +41,7 @@ else # umask
 all:
 
 # Set and export the version string
-export BR2_VERSION := 2016.07
+export BR2_VERSION := 2016.08
 
 # Save running make version since it's clobbered by the make package
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
@@ -605,6 +605,7 @@ endif
 
 define CARGOS_FIXUP
 	-cp -pR $(HOST_DIR)/usr/x86_64-cargos-linux-musl/sysroot/lib/{crt1,crti,crtn}.o $(TARGET_DIR)/lib
+	cd $(TARGET_DIR)/usr/bin && ln -sf ../../lib/ld-musl-x86_64.so.1 ldd
 	cp -pR $(HOST_DIR)/usr/$(GNU_TARGET_NAME)/sysroot/usr/include/* $(TARGET_DIR)/usr/include/
 	find $(TARGET_DIR)/usr/include -name ..install.cmd -exec rm {} \;
 	rm -rf $(TARGET_DIR)/etc/ld.so*

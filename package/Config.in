@@ -7,6 +7,10 @@ menu "Compressors and decompressors"
 	source "package/xz/Config.in"
 endmenu
 
+menu "Crypto"
+	source "package/ca-certificates/Config.in"
+endmenu
+
 menu "Debugging, profiling and benchmark"
 	source "package/gdb/Config.in"
 endmenu
