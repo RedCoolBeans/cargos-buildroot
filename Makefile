@@ -610,6 +610,7 @@ define CARGOS_FIXUP
 	find $(TARGET_DIR)/usr/include -name ..install.cmd -exec rm {} \;
 	rm -rf $(TARGET_DIR)/etc/ld.so*
 	rm -rf $(TARGET_DIR)/var/db/Makefile
+	echo "$(BR2_TARGET_GENERIC_ISSUE)" > $(TARGET_DIR)/etc/issue
 	# Copy for persistent storage
 	rm -rf $(TARGET_DIR)/.etc
 	cp -pR $(TARGET_DIR)/etc $(TARGET_DIR)/.etc
