@@ -1,8 +1,7 @@
-diff --git a/fsr/xfs_fsr.c b/fsr/xfs_fsr.c
-index 6f00b41..5b4af53 100644
---- a/fsr/xfs_fsr.c
-+++ b/fsr/xfs_fsr.c
-@@ -44,6 +44,10 @@
+diff -ruN xfsprogs-4.7.0.orig/fsr/xfs_fsr.c xfsprogs-4.7.0/fsr/xfs_fsr.c
+--- xfsprogs-4.7.0.orig/fsr/xfs_fsr.c	2016-02-29 00:39:26.000000000 +0100
++++ xfsprogs-4.7.0/fsr/xfs_fsr.c	2016-08-12 09:52:18.196254505 +0200
+@@ -36,6 +36,10 @@
  #define _PATH_FSRLAST		"/var/tmp/.fsrlast_xfs"
  #define _PATH_PROC_MOUNTS	"/proc/mounts"
  
@@ -13,10 +12,63 @@ index 6f00b41..5b4af53 100644
  
  char *progname;
  
-diff --git a/libxfs/linux.c b/libxfs/linux.c
-index 2e07d54..4075786 100644
---- a/libxfs/linux.c
-+++ b/libxfs/linux.c
+diff -ruN xfsprogs-4.7.0.orig/include/linux.h xfsprogs-4.7.0/include/linux.h
+--- xfsprogs-4.7.0.orig/include/linux.h	2016-08-04 03:30:01.000000000 +0200
++++ xfsprogs-4.7.0/include/linux.h	2016-08-12 09:52:43.556254165 +0200
+@@ -34,6 +34,37 @@
+ #include <mntent.h>
+ #include <linux/fs.h> /* fsxattr defintion for new kernels */
+ 
++#include <stdio.h>
++
++#ifndef loff_t
++#define loff_t off_t
++#endif
++#ifndef __uint8_t
++#define __uint8_t uint8_t
++#endif
++#ifndef __uint16_t
++#define __uint16_t uint16_t
++#endif
++#ifndef __uint32_t
++#define __uint32_t uint32_t
++#endif
++#ifndef __uint64_t
++#define __uint64_t uint64_t
++#endif
++
++#ifndef __int8_t
++#define __int8_t int8_t
++#endif
++#ifndef __int16_t
++#define __int16_t int16_t
++#endif
++#ifndef __int32_t
++#define __int32_t int32_t
++#endif
++#ifndef __int64_t
++#define __int64_t int64_t
++#endif
++
+ static __inline__ int xfsctl(const char *path, int fd, int cmd, void *p)
+ {
+ 	return ioctl(fd, cmd, p);
+diff -ruN xfsprogs-4.7.0.orig/io/readdir.c xfsprogs-4.7.0/io/readdir.c
+--- xfsprogs-4.7.0.orig/io/readdir.c	2016-02-29 00:39:26.000000000 +0100
++++ xfsprogs-4.7.0/io/readdir.c	2016-08-12 09:52:18.196254505 +0200
+@@ -23,6 +23,9 @@
+ 
+ #include <sys/types.h>
+ #include <dirent.h>
++#define _DIRENT_HAVE_D_OFF
++#define _DIRENT_HAVE_D_RECLEN
++#define _DIRENT_HAVE_D_TYPE
+ 
+ static struct cmdinfo readdir_cmd;
+ 
+diff -ruN xfsprogs-4.7.0.orig/libxfs/linux.c xfsprogs-4.7.0/libxfs/linux.c
+--- xfsprogs-4.7.0.orig/libxfs/linux.c	2016-07-22 00:20:50.000000000 +0200
++++ xfsprogs-4.7.0/libxfs/linux.c	2016-08-12 09:52:18.196254505 +0200
 @@ -16,11 +16,8 @@
   * Inc.,  51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   */
@@ -73,54 +125,3 @@ index 2e07d54..4075786 100644
  }
  
  int
---- old/io/readdir.c
-+++ new/io/readdir.c
-@@ -23,6 +23,9 @@
- 
- #include <sys/types.h>
- #include <dirent.h>
-+#define _DIRENT_HAVE_D_OFF
-+#define _DIRENT_HAVE_D_RECLEN
-+#define _DIRENT_HAVE_D_TYPE
- 
- static struct cmdinfo readdir_cmd;
- 
---- old/include/linux.h
-+++ new/include/linux.h
-@@ -31,6 +31,36 @@
- #include <stdbool.h>
- #include <asm/types.h>
- #include <mntent.h>
-+#include <stdio.h>
-+
-+#ifndef loff_t
-+#define loff_t off_t
-+#endif
-+#ifndef __uint8_t
-+#define __uint8_t uint8_t
-+#endif
-+#ifndef __uint16_t
-+#define __uint16_t uint16_t
-+#endif
-+#ifndef __uint32_t
-+#define __uint32_t uint32_t
-+#endif
-+#ifndef __uint64_t
-+#define __uint64_t uint64_t
-+#endif
-+
-+#ifndef __int8_t
-+#define __int8_t int8_t
-+#endif
-+#ifndef __int16_t
-+#define __int16_t int16_t
-+#endif
-+#ifndef __int32_t
-+#define __int32_t int32_t
-+#endif
-+#ifndef __int64_t
-+#define __int64_t int64_t
-+#endif
- 
- static __inline__ int xfsctl(const char *path, int fd, int cmd, void *p)
- {
