@@ -22,6 +22,6 @@ staff:x:50:
 lock:x:54:
 netdev:x:82:
 ftp:x:83:
-nogroup:x:99:
+nogroup:x:65534:
 users:x:100:
 input:x:101:
