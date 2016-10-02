@@ -8,8 +8,8 @@ config BR2_GCC_SUPPORTS_GRAPHITE
 
 choice
 	prompt "GCC compiler Version"
-	default BR2_GCC_VERSION_4_8_ARC if BR2_arc
-	default BR2_GCC_VERSION_4_9_X
+	default BR2_GCC_VERSION_ARC if BR2_arc
+	default BR2_GCC_VERSION_5_X
 	help
 	  Select the version of gcc you wish to use.
 
@@ -18,7 +18,7 @@ choice
 		depends on BR2_DEPRECATED_SINCE_2016_05
 		# Broken or unsupported architectures
 		depends on !BR2_microblaze && !BR2_aarch64 && !BR2_arc \
-			&& !BR2_powerpc64le && !BR2_nios2
+			&& !BR2_powerpc64le && !BR2_nios2 && !BR2_bfin
 		# Broken or unsupported ARM cores
 		depends on !BR2_cortex_a12 && !BR2_pj4 && !BR2_cortex_a17
 		# Broken or unsupported PPC cores
@@ -39,7 +39,7 @@ choice
 		bool "gcc 4.8.x"
 		# Broken or unsupported architectures
 		depends on !BR2_microblaze && !BR2_arc \
-			&& !BR2_powerpc64le && !BR2_nios2
+			&& !BR2_powerpc64le && !BR2_nios2 && !BR2_bfin
 		# Broken or unsupported ARM cores
 		depends on !BR2_cortex_a12 && !BR2_cortex_a17
 		# Broken or unsupported PPC cores
@@ -56,18 +56,18 @@ choice
 		select BR2_GCC_SUPPORTS_GRAPHITE
 		select BR2_TOOLCHAIN_GCC_AT_LEAST_4_8
 
-	config BR2_GCC_VERSION_4_8_ARC
-		bool "gcc 4.8-arc"
+	config BR2_GCC_VERSION_ARC
+		bool "gcc arc (6.x)"
 		# Only supported architecture
 		depends on BR2_arc
 		select BR2_GCC_NEEDS_MPC
-		select BR2_TOOLCHAIN_GCC_AT_LEAST_4_8
+		select BR2_TOOLCHAIN_GCC_AT_LEAST_6
 
 
 	config BR2_GCC_VERSION_4_9_X
 		bool "gcc 4.9.x"
 		# Broken or unsupported architectures
-		depends on !BR2_arc
+		depends on !BR2_arc && !BR2_bfin
 		# Broken or unsupported ARM cores
 		depends on !BR2_cortex_a17
 		# Unsupported for MIPS R6
@@ -120,8 +120,8 @@ config BR2_GCC_VERSION
 	default "4.8.5"     if BR2_GCC_VERSION_4_8_X
 	default "4.9.4"     if BR2_GCC_VERSION_4_9_X
 	default "5.4.0"     if BR2_GCC_VERSION_5_X
-	default "6.1.0" if BR2_GCC_VERSION_6_X
-	default "arc-2015.12" if BR2_GCC_VERSION_4_8_ARC
+	default "6.2.0"     if BR2_GCC_VERSION_6_X
+	default "arc-2016.09-eng013" if BR2_GCC_VERSION_ARC
 
 config BR2_EXTRA_GCC_CONFIG_OPTIONS
 	string "Additional gcc options"
@@ -134,16 +134,21 @@ config BR2_EXTRA_GCC_CONFIG_OPTIONS
 config BR2_TOOLCHAIN_BUILDROOT_CXX
 	bool "Enable C++ support"
 	select BR2_INSTALL_LIBSTDCPP
-	# C++ support currently broken for Blackfin, under
-	# investigation.
-	depends on !BR2_bfin
 	help
 	  Enable this option if you want your toolchain to support the
 	  C++ language and you want C++ libraries to be installed on
 	  your target system.
 
+comment "Fortran support needs a toolchain w/ wchar"
+	depends on BR2_TOOLCHAIN_HAS_LIBQUADMATH
+	depends on !BR2_USE_WCHAR # libquadmath
+
 config BR2_TOOLCHAIN_BUILDROOT_FORTRAN
 	bool "Enable Fortran support"
+	# on architecture building libquadmath, wchar is required
+	depends on !BR2_TOOLCHAIN_HAS_LIBQUADMATH || \
+		(BR2_TOOLCHAIN_HAS_LIBQUADMATH && BR2_USE_WCHAR)
+	select BR2_TOOLCHAIN_HAS_FORTRAN
 	help
 	  Enable this option if you want your toolchain to support the
 	  Fortran language and you want Fortran libraries to be

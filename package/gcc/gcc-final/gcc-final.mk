@@ -74,9 +74,14 @@ HOST_GCC_FINAL_CONF_OPTS += "--with-multilib-list=m4a,m4a-nofpu"
 HOST_GCC_FINAL_GCC_LIB_DIR = $(HOST_DIR)/usr/$(GNU_TARGET_NAME)/lib/!m4*
 endif
 
+ifeq ($(BR2_bfin),y)
+HOST_GCC_FINAL_CONF_OPTS += --disable-symvers
+endif
+
 # Disable shared libs like libstdc++ if we do static since it confuses linking
+# In that case also disable libcilkrts as there is no static version
 ifeq ($(BR2_STATIC_LIBS),y)
-HOST_GCC_FINAL_CONF_OPTS += --disable-shared
+HOST_GCC_FINAL_CONF_OPTS += --disable-shared --disable-libcilkrts
 else
 HOST_GCC_FINAL_CONF_OPTS += --enable-shared
 endif
@@ -113,9 +118,9 @@ HOST_GCC_FINAL_POST_BUILD_HOOKS += TOOLCHAIN_BUILD_WRAPPER
 # -cc symlink to the wrapper is not created.
 HOST_GCC_FINAL_POST_INSTALL_HOOKS += HOST_GCC_INSTALL_WRAPPER_AND_SIMPLE_SYMLINKS
 
-# In gcc 4.7.x, the ARM EABIhf library loader path for (e)glibc was not
+# In gcc 4.7.x, the ARM EABIhf library loader path for glibc was not
 # correct, so we create a symbolic link to make things work
-# properly. eglibc installs the library loader as ld-linux-armhf.so.3,
+# properly. glibc installs the library loader as ld-linux-armhf.so.3,
 # but gcc creates binaries that reference ld-linux.so.3.
 ifeq ($(BR2_arm)$(BR2_ARM_EABIHF)$(BR2_GCC_VERSION_4_7_X)$(BR2_TOOLCHAIN_USES_GLIBC),yyyy)
 define HOST_GCC_FINAL_LD_LINUX_LINK
@@ -163,6 +168,10 @@ endif
 
 ifeq ($(BR2_TOOLCHAIN_BUILDROOT_FORTRAN),y)
 HOST_GCC_FINAL_USR_LIBS += libgfortran
+# fortran needs quadmath on x86 and x86_64
+ifeq ($(BR2_TOOLCHAIN_HAS_LIBQUADMATH),y)
+HOST_GCC_FINAL_USR_LIBS += libquadmath
+endif
 endif
 
 ifeq ($(BR2_GCC_ENABLE_OPENMP),y)
