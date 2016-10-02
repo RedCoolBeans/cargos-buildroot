@@ -47,6 +47,17 @@ config BR2_GLIBC_VERSION_2_23
 	# No support for pthread barriers on < v9 ISA
 	depends on !BR2_sparc
 
+config BR2_GLIBC_VERSION_2_24
+	bool "2.24"
+	# No support for pthread barriers on < v9 ISA
+	depends on !BR2_sparc
+	# Linux 3.2 or later kernel headers are required on all arches.
+	# See: https://sourceware.org/ml/libc-alpha/2016-08/msg00212.html
+	depends on BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_2
+
+comment "glibc-2.24 needs kernel headers >= 3.2"
+	depends on !BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_2
+
 endchoice
 
 endif
@@ -57,3 +68,4 @@ config BR2_GLIBC_VERSION_STRING
 	default "2.19-svnr25243" if BR2_EGLIBC_VERSION_2_19
 	default "2.22" if BR2_GLIBC_VERSION_2_22
 	default "2.23" if BR2_GLIBC_VERSION_2_23
+	default "2.24" if BR2_GLIBC_VERSION_2_24
