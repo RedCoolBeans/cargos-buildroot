@@ -51,7 +51,7 @@ menu "Compression and decompression"
 endmenu
 
 menu "Other"
-	source "package/netbsd-queue/Config.in"
+	source "package/musl-compat-headers/Config.in"
 	source "package/tzdata/Config.in"
 endmenu
 
