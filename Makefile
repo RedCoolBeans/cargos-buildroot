@@ -24,6 +24,56 @@
 # You shouldn't need to mess with anything beyond this point...
 #--------------------------------------------------------------
 
+# we want bash as shell
+SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
+	 else if [ -x /bin/bash ]; then echo /bin/bash; \
+	 else echo sh; fi; fi)
+
+# Set O variable if not already done on the command line;
+# or avoid confusing packages that can use the O=<dir> syntax for out-of-tree
+# build by preventing it from being forwarded to sub-make calls.
+ifneq ("$(origin O)", "command line")
+O := $(CURDIR)/output
+else
+# Strangely enough O is still passed to submakes with MAKEOVERRIDES
+# (with make 3.81 atleast), the only thing that changes is the output
+# of the origin function (command line -> environment).
+# Unfortunately some packages don't look at origin (E.G. uClibc 0.9.31+)
+# To really make O go away, we have to override it.
+override O := $(O)
+endif
+
+# Check if the current Buildroot execution meets all the pre-requisites.
+# If they are not met, Buildroot will actually do its job in a sub-make meeting
+# its pre-requisites, which are:
+#  1- Permissive enough umask:
+#       Wrong or too restrictive umask will prevent Buildroot and packages from
+#       creating files and directories.
+#  2- Absolute canonical CWD (i.e. $(CURDIR)):
+#       Otherwise, some packages will use CWD as-is, others will compute its
+#       absolute canonical path. This makes harder tracking and fixing host
+#       machine path leaks.
+#  3- Absolute canonical output location (i.e. $(O)):
+#       For the same reason as the one for CWD.
+
+# Remove the trailing '/.' from $(O) as it can be added by the makefile wrapper
+# installed in the $(O) directory.
+# Also remove the trailing '/' the user can set when on the command line.
+override O := $(patsubst %/,%,$(patsubst %.,%,$(O)))
+# Make sure $(O) actually exists before calling realpath on it; this is to
+# avoid empty CANONICAL_O in case on non-existing entry.
+CANONICAL_O := $(shell mkdir -p $(O) >/dev/null 2>&1)$(realpath $(O))
+
+CANONICAL_CURDIR = $(realpath $(CURDIR))
+
+REQ_UMASK = 0022
+
+# Make sure O= is passed (with its absolute canonical path) everywhere the
+# toplevel makefile is called back.
+EXTRAMAKEARGS := O=$(CANONICAL_O)
+
+# Check Buildroot execution pre-requisites here.
+ifneq ($(shell umask):$(CURDIR):$(O),$(REQ_UMASK):$(CANONICAL_CURDIR):$(CANONICAL_O))
 .PHONY: _all $(MAKECMDGOALS)
 
 $(MAKECMDGOALS): _all
@@ -99,6 +149,13 @@ BR_BUILDING = y
 else ifneq ($(filter-out $(nobuild_targets),$(MAKECMDGOALS)),)
 BR_BUILDING = y
 endif
+
+# We call make recursively to build packages. The command-line overrides that
+# are passed to Buildroot don't apply to those package build systems. In
+# particular, we don't want to pass down the O=<dir> option for out-of-tree
+# builds, because the value specified on the command line will not be correct
+# for packages.
+MAKEOVERRIDES :=
 
 # Include some helper macros and variables
 include support/misc/utils.mk
