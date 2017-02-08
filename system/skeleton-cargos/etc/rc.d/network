@@ -216,15 +216,15 @@ network_start_interfaces()
 			dhcp)
 				if ! checkyesno udhcpc; then
 					/sbin/udhcpc \
-						${udhcpc_flags} -i $int \
-						-p /var/run/udhcpc-${int}.pid >/dev/null
+						${udhcpc_flags} -S -b -i $int \
+						-p /var/run/udhcpc-${int}.pid >/dev/null 2>&1
 				fi
 				;;
 			dhcp6)
 				if ! checkyesno udhcpc6; then
 					/usr/bin/udhcpc6 \
-						${udhcpc6_flags} -i $int \
-						-p /var/run/udhcpc6-${int}.pid >/dev/null
+						${udhcpc6_flags} -S -b -i $int \
+						-p /var/run/udhcpc6-${int}.pid >/dev/null 2>&1
 				fi
 				;;
 			*)
