@@ -530,15 +530,16 @@ prompt_disk() {
 
 create_persistent() {
 	local _cmds
-	_cmds[0]="fdisk"
-	_cmds[1]="mkfs_boot"
-	_cmds[2]="pvcreate"
-	_cmds[3]="vgcreate"
-	_cmds[4]="lvcreate"
-	_cmds[5]="mkfs_lvm"
-	_cmds[6]="mount"
-	_cmds[7]="bootstrap"
-	_cmds[8]="random-seed"
+	_cmds[0]="dd"
+	_cmds[1]="fdisk"
+	_cmds[2]="mkfs_boot"
+	_cmds[3]="pvcreate"
+	_cmds[4]="vgcreate"
+	_cmds[5]="lvcreate"
+	_cmds[6]="mkfs_lvm"
+	_cmds[7]="mount"
+	_cmds[8]="bootstrap"
+	_cmds[9]="random-seed"
 
 	local _parts=$(for d in ${_sdisks} ; do echo ${d}2 ; done | xargs echo)
 
@@ -549,6 +550,13 @@ create_persistent() {
 		local _pct=$(( 100*(++i)/n ))
 		echo ${_pct}
 		case ${f} in
+		dd)
+			{
+			for dev in ${_sdisks}; do
+				dd if=/dev/zero of=${dev} bs=2M count=1
+			done
+			} >> ${_install_log} 2>&1
+			;;
 		fdisk)
 			{
 			for dev in ${_sdisks}; do
@@ -1046,8 +1054,8 @@ while [ /usr/bin/true ]; do
 		while true; do prompt_disk && break ; done
 		create_persistent
 		create_network_config
-		while true ; do change_root_password && break ; done
-		#set_timezone
+		change_root_password
+		set_timezone
 		save_kmap
 		prompt_localboot && do_localboot yes || :
 	fi
