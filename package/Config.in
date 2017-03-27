@@ -47,6 +47,7 @@ endmenu
 menu "Libraries"
 
 menu "Compression and decompression"
+	source "package/lzip/Config.in"
 	source "package/zlib/Config.in"
 endmenu
 
