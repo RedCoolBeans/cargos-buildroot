@@ -15,11 +15,17 @@ ACL_LICENSE_FILES = doc/COPYING doc/COPYING.LGPL
 
 # While the configuration system uses autoconf, the Makefiles are
 # hand-written and do not use automake. Therefore, we have to hack
-# around their deficiencies by passing installation paths.
-ACL_INSTALL_STAGING_OPTS = 			\
-	prefix=$(STAGING_DIR)/usr 		\
-	exec_prefix=$(STAGING_DIR)/usr 		\
-	PKG_DEVLIB_DIR=$(STAGING_DIR)/usr/lib	\
+# around their deficiencies by:
+# - explicitly passing CFLAGS (LDFLAGS are passed on from configure,
+#   CFLAGS are not).
+# - explicitly passing the installation prefix, not using DESTDIR.
+
+ACL_MAKE_ENV = CFLAGS="$(TARGET_CFLAGS)"
+
+ACL_INSTALL_STAGING_OPTS = \
+	prefix=$(STAGING_DIR)/usr \
+	exec_prefix=$(STAGING_DIR)/usr \
+	PKG_DEVLIB_DIR=$(STAGING_DIR)/usr/lib \
 	install-dev install-lib
 
 ACL_INSTALL_TARGET_OPTS = 			\
